@@ -47,6 +47,10 @@ jobs:
           cp -r /tmp/flutter_scaffold/android ./android
           cp -r /tmp/flutter_scaffold/test ./test
           cp /tmp/flutter_scaffold/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true
+          
+          # Update minSdkVersion to 21 for flutter_inappwebview support
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+          sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
 
       - name: Inject site configuration
         run: |
