@@ -1,0 +1,67 @@
+﻿2026-07-30T16:32:46.6414605Z ##[group]Run # Create a temporary Flutter project to get the Android boilerplate
+2026-07-30T16:32:46.6415521Z [36;1m# Create a temporary Flutter project to get the Android boilerplate[0m
+2026-07-30T16:32:46.6416543Z [36;1mflutter create --project-name appreso_app --org com.appreso --platforms android /tmp/flutter_scaffold[0m
+2026-07-30T16:32:46.6417397Z [36;1m[0m
+2026-07-30T16:32:46.6417812Z [36;1m# Copy Android directory from scaffold to our project[0m
+2026-07-30T16:32:46.6418437Z [36;1mcp -r /tmp/flutter_scaffold/android ./android[0m
+2026-07-30T16:32:46.6418849Z [36;1mcp -r /tmp/flutter_scaffold/test ./test[0m
+2026-07-30T16:32:46.6419352Z [36;1mcp /tmp/flutter_scaffold/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true[0m
+2026-07-30T16:32:46.6419842Z [36;1m[0m
+2026-07-30T16:32:46.6420165Z [36;1m# Update minSdkVersion to 21 for flutter_inappwebview support[0m
+2026-07-30T16:32:46.6420740Z [36;1msed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle[0m
+2026-07-30T16:32:46.6421614Z [36;1msed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true[0m
+2026-07-30T16:32:46.6471584Z shell: /usr/bin/bash -e {0}
+2026-07-30T16:32:46.6471884Z env:
+2026-07-30T16:32:46.6472207Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-07-30T16:32:46.6472746Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-07-30T16:32:46.6473246Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.24.5-x64/flutter
+2026-07-30T16:32:46.6473660Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-30T16:32:46.6473935Z ##[endgroup]
+2026-07-30T16:32:46.8009348Z 
+2026-07-30T16:32:46.8023891Z   ╔════════════════════════════════════════════════════════════════════════════╗
+2026-07-30T16:32:46.8024556Z   ║                 Welcome to Flutter! - https://flutter.dev                  ║
+2026-07-30T16:32:46.8025111Z   ║                                                                            ║
+2026-07-30T16:32:46.8025682Z   ║ The Flutter tool uses Google Analytics to anonymously report feature usage ║
+2026-07-30T16:32:46.8026284Z   ║ statistics and basic crash reports. This data is used to help improve      ║
+2026-07-30T16:32:46.8026812Z   ║ Flutter tools over time.                                                   ║
+2026-07-30T16:32:46.8027611Z   ║                                                                            ║
+2026-07-30T16:32:46.8028078Z   ║ Flutter tool analytics are not sent on the very first run. To disable      ║
+2026-07-30T16:32:46.8029067Z   ║ reporting, type 'flutter config --no-analytics'. To display the current    ║
+2026-07-30T16:32:46.8029699Z   ║ setting, type 'flutter config'. If you opt out of analytics, an opt-out    ║
+2026-07-30T16:32:46.8030544Z   ║ event will be sent, and then no further information will be sent by the    ║
+2026-07-30T16:32:46.8031467Z   ║ Flutter tool.                                                              ║
+2026-07-30T16:32:46.8032173Z   ║                                                                            ║
+2026-07-30T16:32:46.8033019Z   ║ By downloading the Flutter SDK, you agree to the Google Terms of Service.  ║
+2026-07-30T16:32:46.8033868Z   ║ The Google Privacy Policy describes how data is handled in this service.   ║
+2026-07-30T16:32:46.8034578Z   ║                                                                            ║
+2026-07-30T16:32:46.8035426Z   ║ Moreover, Flutter includes the Dart SDK, which may send usage metrics and  ║
+2026-07-30T16:32:46.8036222Z   ║ crash reports to Google.                                                   ║
+2026-07-30T16:32:46.8036913Z   ║                                                                            ║
+2026-07-30T16:32:46.8037896Z   ║ Read about data we send with crash reports:                                ║
+2026-07-30T16:32:46.8038776Z   ║ https://flutter.dev/to/crash-reporting                                     ║
+2026-07-30T16:32:46.8039504Z   ║                                                                            ║
+2026-07-30T16:32:46.8040628Z   ║ See Google's privacy policy:                                               ║
+2026-07-30T16:32:46.8041540Z   ║ https://policies.google.com/privacy                                        ║
+2026-07-30T16:32:46.8042044Z   ║                                                                            ║
+2026-07-30T16:32:46.8042508Z   ║ To disable animations in this tool, use                                    ║
+2026-07-30T16:32:46.8043037Z   ║ 'flutter config --no-cli-animations'.                                      ║
+2026-07-30T16:32:46.8043572Z   ╚════════════════════════════════════════════════════════════════════════════╝
+2026-07-30T16:32:46.8043818Z 
+2026-07-30T16:32:51.9804480Z Creating project ../../../../../tmp/flutter_scaffold...
+2026-07-30T16:32:52.9891368Z Resolving dependencies in `../../../../../tmp/flutter_scaffold`...
+2026-07-30T16:32:53.4901804Z Downloading packages...
+2026-07-30T16:32:54.0943464Z Got dependencies in `../../../../../tmp/flutter_scaffold`.
+2026-07-30T16:32:54.2151686Z Wrote 35 files.
+2026-07-30T16:32:54.2151945Z 
+2026-07-30T16:32:54.2152044Z All done!
+2026-07-30T16:32:54.2167760Z You can find general documentation for Flutter at: https://docs.flutter.dev/
+2026-07-30T16:32:54.2168557Z Detailed API documentation is available at: https://api.flutter.dev/
+2026-07-30T16:32:54.2169172Z If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+2026-07-30T16:32:54.2169522Z 
+2026-07-30T16:32:54.2169640Z In order to run your application, type:
+2026-07-30T16:32:54.2169836Z 
+2026-07-30T16:32:54.2169941Z   $ cd ../../../../../tmp/flutter_scaffold
+2026-07-30T16:32:54.2170208Z   $ flutter run
+2026-07-30T16:32:54.2170334Z 
+2026-07-30T16:32:54.2170542Z Your application code is in ../../../../../tmp/flutter_scaffold/lib/main.dart.
+2026-07-30T16:32:54.2170843Z 

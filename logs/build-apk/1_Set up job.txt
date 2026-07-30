@@ -1,0 +1,35 @@
+﻿2026-07-30T16:32:12.6214939Z Current runner version: '2.336.0'
+2026-07-30T16:32:12.6243293Z ##[group]Runner Image Provisioner
+2026-07-30T16:32:12.6244199Z Hosted Compute Agent
+2026-07-30T16:32:12.6244795Z Version: 20260707.563
+2026-07-30T16:32:12.6245485Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-30T16:32:12.6246259Z Build Date: 2026-07-07T19:33:50Z
+2026-07-30T16:32:12.6247033Z Worker ID: {e30a480c-cfdd-41f1-b72b-0db350de8270}
+2026-07-30T16:32:12.6247767Z Azure Region: eastus2
+2026-07-30T16:32:12.6248368Z ##[endgroup]
+2026-07-30T16:32:12.6249893Z ##[group]Operating System
+2026-07-30T16:32:12.6250571Z Ubuntu
+2026-07-30T16:32:12.6251374Z 24.04.4
+2026-07-30T16:32:12.6252052Z LTS
+2026-07-30T16:32:12.6252592Z ##[endgroup]
+2026-07-30T16:32:12.6253184Z ##[group]Runner Image
+2026-07-30T16:32:12.6253854Z Image: ubuntu-24.04
+2026-07-30T16:32:12.6254437Z Version: 20260726.254.1
+2026-07-30T16:32:12.6255573Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260726.254/images/ubuntu/Ubuntu2404-Readme.md
+2026-07-30T16:32:12.6257598Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260726.254
+2026-07-30T16:32:12.6258686Z ##[endgroup]
+2026-07-30T16:32:12.6259828Z ##[group]GITHUB_TOKEN Permissions
+2026-07-30T16:32:12.6262516Z Contents: write
+2026-07-30T16:32:12.6263153Z Metadata: read
+2026-07-30T16:32:12.6263829Z ##[endgroup]
+2026-07-30T16:32:12.6265983Z Secret source: Actions
+2026-07-30T16:32:12.6267370Z Prepare workflow directory
+2026-07-30T16:32:12.6596571Z Prepare all required actions
+2026-07-30T16:32:12.6644283Z Getting action download info
+2026-07-30T16:32:12.8998020Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-07-30T16:32:13.0540885Z Download action repository 'actions/setup-java@v4' (SHA:c1e323688fd81a25caa38c78aa6df2d33d3e20d9)
+2026-07-30T16:32:13.3368290Z Download action repository 'subosito/flutter-action@v2' (SHA:1a449444c387b1966244ae4d4f8c696479add0b2)
+2026-07-30T16:32:13.4604724Z Download action repository 'softprops/action-gh-release@v2' (SHA:3bb12739c298aeb8a4eeaf626c5b8d85266b0e65)
+2026-07-30T16:32:13.7255307Z Getting action download info
+2026-07-30T16:32:13.8382750Z Download action repository 'actions/cache@v5' (SHA:caa296126883cff596d87d8935842f9db880ef25)
+2026-07-30T16:32:14.0506244Z Complete job name: build-apk

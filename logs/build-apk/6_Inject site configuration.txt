@@ -1,0 +1,24 @@
+﻿2026-07-30T16:32:55.5818311Z ##[group]Run SITE_URL="https://muhitdemosite.wp1.site"
+2026-07-30T16:32:55.5818786Z [36;1mSITE_URL="https://muhitdemosite.wp1.site"[0m
+2026-07-30T16:32:55.5819110Z [36;1mAPP_NAME="Awsome app"[0m
+2026-07-30T16:32:55.5819356Z [36;1m[0m
+2026-07-30T16:32:55.5819569Z [36;1mmkdir -p assets[0m
+2026-07-30T16:32:55.5819826Z [36;1mcat > assets/config.json << EOF[0m
+2026-07-30T16:32:55.5820089Z [36;1m{[0m
+2026-07-30T16:32:55.5820485Z [36;1m  "site_url": "${SITE_URL}",[0m
+2026-07-30T16:32:55.5820765Z [36;1m  "app_name": "${APP_NAME}",[0m
+2026-07-30T16:32:55.5821270Z [36;1m  "api_namespace": "appreso/v1"[0m
+2026-07-30T16:32:55.5821549Z [36;1m}[0m
+2026-07-30T16:32:55.5821731Z [36;1mEOF[0m
+2026-07-30T16:32:55.5821916Z [36;1m[0m
+2026-07-30T16:32:55.5822106Z [36;1mecho "Site URL: ${SITE_URL}"[0m
+2026-07-30T16:32:55.5822362Z [36;1mecho "App Name: ${APP_NAME}"[0m
+2026-07-30T16:32:55.5869866Z shell: /usr/bin/bash -e {0}
+2026-07-30T16:32:55.5870126Z env:
+2026-07-30T16:32:55.5870439Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-07-30T16:32:55.5870980Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-8/x64
+2026-07-30T16:32:55.5871682Z   FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.24.5-x64/flutter
+2026-07-30T16:32:55.5872056Z   PUB_CACHE: /home/runner/.pub-cache
+2026-07-30T16:32:55.5872317Z ##[endgroup]
+2026-07-30T16:32:55.5965295Z Site URL: https://muhitdemosite.wp1.site
+2026-07-30T16:32:55.5965730Z App Name: Awsome app
