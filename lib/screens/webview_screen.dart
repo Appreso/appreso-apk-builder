@@ -134,13 +134,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 },
                 onReceivedError: (controller, request, error) {
                   pullToRefreshController?.endRefreshing();
-                  if (request.isForMainFrame) {
+                  if (request.isForMainFrame == true) {
                     _showToast("Failed to load: ${error.description}");
                   }
                 },
                 onReceivedHttpError: (controller, request, errorResponse) {
                   pullToRefreshController?.endRefreshing();
-                  if (request.isForMainFrame) {
+                  if (request.isForMainFrame == true) {
                     _showToast("HTTP Error: ${errorResponse.statusCode}");
                   }
                 },
