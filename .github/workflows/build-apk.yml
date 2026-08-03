@@ -43,10 +43,14 @@ jobs:
           # Create a temporary Flutter project to get the Android boilerplate
           flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/flutter_scaffold
           
-          # Copy Android directory from scaffold to our project
+          # Copy Android directory and CRITICAL hidden files from scaffold to our project
           cp -r /tmp/flutter_scaffold/android ./android
           cp -r /tmp/flutter_scaffold/test ./test
           cp /tmp/flutter_scaffold/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true
+          
+          # IMPORTANT: The .metadata file tells Flutter this is a modern Android project
+          # Without this, Flutter treats it as a legacy project, causing plugins like app_links to fail!
+          cp /tmp/flutter_scaffold/.metadata ./.metadata
           
           # Update minSdkVersion to 21 for flutter_inappwebview support
           # Handle both Groovy and Kotlin DSL formats
