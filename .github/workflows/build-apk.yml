@@ -38,24 +38,19 @@ jobs:
           flutter-version: '3.24.x'
           cache: true
 
-      - name: Create Flutter project scaffold
+      - name: Create Pristine Flutter Project
         run: |
-          # Create a temporary Flutter project to get the Android boilerplate
-          flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/flutter_scaffold
+          # Instead of copying android/ to our repo, we create a fresh project
+          # and copy our code into it. This guarantees all hidden files (.metadata)
+          # and Gradle configurations are 100% correct for the current Flutter version.
+          flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/appreso_build
           
-          # Copy Android directory and CRITICAL hidden files from scaffold to our project
-          cp -r /tmp/flutter_scaffold/android ./android
-          cp -r /tmp/flutter_scaffold/test ./test
-          cp /tmp/flutter_scaffold/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true
+          # Copy our custom source code into the fresh project
+          cp -r lib /tmp/appreso_build/
+          cp -r assets /tmp/appreso_build/ 2>/dev/null || true
+          cp pubspec.yaml /tmp/appreso_build/
           
-          # IMPORTANT: The .metadata file tells Flutter this is a modern Android project
-          # Without this, Flutter treats it as a legacy project, causing plugins like app_links to fail!
-          cp /tmp/flutter_scaffold/.metadata ./.metadata
-          
-          # Update minSdkVersion to 21 for flutter_inappwebview support
-          # Handle both Groovy and Kotlin DSL formats
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
+          # We will do all further build steps inside /tmp/appreso_build
 
       - name: Process Configuration Payload
         id: config
@@ -64,9 +59,10 @@ jobs:
           INPUT_SITE: ${{ github.event.inputs.site_url }}
           INPUT_NAME: ${{ github.event.inputs.app_name }}
         run: |
-          # Safely write the JSON payload to a file using environment variables
+          cd /tmp/appreso_build
+          
+          # Safely write the JSON payload to a file
           if [ -z "$PAYLOAD_JSON" ]; then
-            # Build dummy JSON if manual trigger
             echo "{\"site_url\":\"$INPUT_SITE\",\"app_name\":\"$INPUT_NAME\"}" > payload.json
           else
             echo "$PAYLOAD_JSON" > payload.json
@@ -85,16 +81,24 @@ jobs:
           echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
           echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
+      - name: Update Gradle minSdkVersion
+        run: |
+          cd /tmp/appreso_build
+          
+          # Update minSdkVersion to 21 for flutter_inappwebview support
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
+
       - name: Download and set App Icon
         run: |
+          cd /tmp/appreso_build
+          
           if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
             echo "Downloading app icon from: $APP_ICON_URL"
             curl -L -o assets/app_icon.png "$APP_ICON_URL"
             
-            # Install ImageMagick for icon resizing
             sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
             
-            # Generate Android launcher icons at various densities
             ICON_DIRS=(
               "android/app/src/main/res/mipmap-mdpi:48"
               "android/app/src/main/res/mipmap-hdpi:72"
@@ -108,52 +112,47 @@ jobs:
               SIZE="${entry##*:}"
               mkdir -p "$DIR"
               convert assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png"
-              echo "Generated ${SIZE}x${SIZE} icon in $DIR"
             done
-          else
-            echo "No app icon URL provided, using default Flutter icon"
           fi
 
       - name: Download Splash Screen
         run: |
+          cd /tmp/appreso_build
           if [ -n "$SPLASH_SCREEN_URL" ] && [ "$SPLASH_SCREEN_URL" != "" ]; then
-            echo "Downloading splash screen from: $SPLASH_SCREEN_URL"
             curl -L -o assets/splash.png "$SPLASH_SCREEN_URL"
-            echo "Splash screen saved"
           fi
 
-      - name: Set App Label in AndroidManifest.xml
+      - name: Set App Label & Deep Linking in AndroidManifest.xml
         run: |
-          # Use | as delimiter in sed to avoid issues if APP_NAME contains slashes
+          cd /tmp/appreso_build
+          
+          # Set App Label
           sed -i "s|android:label=\"appreso_app\"|android:label=\"${APP_NAME}\"|g" android/app/src/main/AndroidManifest.xml
           
-          # Also add internet permission if not already there
+          # Internet Permission
           if ! grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
           fi
           
-          echo "App label set to: ${APP_NAME}"
-
-      - name: Configure Deep Linking
-        run: |
+          # Deep Linking
           if [ -n "$DEEP_LINK_URL" ] && [ "$DEEP_LINK_URL" != "" ]; then
-            echo "Configuring deep link for: $DEEP_LINK_URL"
-            
             SCHEME=$(echo "$DEEP_LINK_URL" | sed -E 's|^(.*)://.*|\1|')
             HOST=$(echo "$DEEP_LINK_URL" | sed -E 's|^.*://([^/]*).*|\1|')
             
             INTENT_FILTER="<intent-filter android:autoVerify=\"true\">\n<action android:name=\"android.intent.action.VIEW\" />\n<category android:name=\"android.intent.category.DEFAULT\" />\n<category android:name=\"android.intent.category.BROWSABLE\" />\n<data android:scheme=\"$SCHEME\" android:host=\"$HOST\" />\n</intent-filter>"
             
             sed -i "/<\/activity>/i $INTENT_FILTER" android/app/src/main/AndroidManifest.xml
-          else
-            echo "No deep link configured"
           fi
 
-      - name: Install Flutter dependencies
-        run: flutter pub get
-
       - name: Build Release APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: |
+          cd /tmp/appreso_build
+          flutter pub get
+          flutter build apk --release --no-tree-shake-icons
+          
+          # Copy the built APK back to the workspace so GitHub Actions can upload it
+          mkdir -p $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
+          cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
 
       - name: Create Release & Upload APK
         id: create_release
@@ -176,23 +175,20 @@ jobs:
           APK_URL="https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk"
           
           if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
-            echo "Sending callback to: $CALLBACK_URL"
-            
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            curl -s -o /dev/null -w "%{http_code}" \
               -X POST "$CALLBACK_URL" \
               -H "Content-Type: application/json" \
               -H "X-AppReso-Secret: $CALLBACK_SECRET" \
-              -d "{\"apk_url\": \"${APK_URL}\", \"status\": \"success\"}")
-            
-            echo "Callback response status: $HTTP_STATUS"
+              -d "{\"apk_url\": \"${APK_URL}\", \"status\": \"success\"}"
           fi
 
       - name: Send failure callback
         if: failure()
         run: |
-          if [ -f payload.json ]; then
-            CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)
-            CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)
+          # Fallback to reading from the workspace or /tmp
+          if [ -f /tmp/appreso_build/payload.json ]; then
+            CALLBACK_URL=$(jq -r '.callback_url // empty' /tmp/appreso_build/payload.json)
+            CALLBACK_SECRET=$(jq -r '.callback_secret // empty' /tmp/appreso_build/payload.json)
             
             if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
               curl -s -X POST "$CALLBACK_URL" \
