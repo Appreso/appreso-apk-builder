@@ -52,86 +52,40 @@ jobs:
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
           sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
 
-      - name: Inject site configuration
+      - name: Process Configuration Payload
+        id: config
         run: |
-          SITE_URL="${{ github.event.client_payload.site_url || github.event.inputs.site_url }}"
-          APP_NAME="${{ github.event.client_payload.app_name || github.event.inputs.app_name }}"
-          SPLASH_TYPE="${{ github.event.client_payload.splash_type || 'color' }}"
-          SPLASH_BG_COLOR="${{ github.event.client_payload.splash_bg_color || '#4f46e5' }}"
-          SPLASH_SHOW_NAME="${{ github.event.client_payload.splash_show_name || 'yes' }}"
-          SPLASH_CUSTOM_TEXT="${{ github.event.client_payload.splash_custom_text || '' }}"
-          SPLASH_TEXT_COLOR="${{ github.event.client_payload.splash_text_color || '#ffffff' }}"
-          PRELOADER_ENABLED="${{ github.event.client_payload.preloader_enabled || 'yes' }}"
-          PRELOADER_STYLE="${{ github.event.client_payload.preloader_style || 'circular' }}"
-          PRELOADER_COLOR="${{ github.event.client_payload.preloader_color || '#6366f1' }}"
-          PRELOADER_BG_COLOR="${{ github.event.client_payload.preloader_bg_color || '#ffffff' }}"
-          PULL_REFRESH="${{ github.event.client_payload.pull_refresh || 'yes' }}"
-          PULL_REFRESH_COLOR="${{ github.event.client_payload.pull_refresh_color || '#6366f1' }}"
-          STATUS_BAR_COLOR="${{ github.event.client_payload.status_bar_color || '#6366f1' }}"
-          SHOW_BRANDING="${{ github.event.client_payload.show_branding || 'yes' }}"
+          # To bypass GitHub's 10 property limit for repository_dispatch, 
+          # we pass everything inside a single JSON string called config_json
+          CONFIG_JSON='${{ github.event.client_payload.config_json }}'
           
-          # Phase 1 Features
-          OFFLINE_MODE="${{ github.event.client_payload.offline_mode || 'yes' }}"
-          APP_VERSION="${{ github.event.client_payload.app_version || '1.0.0' }}"
-          UPDATE_MESSAGE="${{ github.event.client_payload.update_message || 'A new version of the app is available. Please update to continue.' }}"
-          ONESIGNAL_APP_ID="${{ github.event.client_payload.onesignal_app_id || '' }}"
-          DEEP_LINK_URL="${{ github.event.client_payload.deep_link_url || '' }}"
-          BOTTOM_NAV_ENABLED="${{ github.event.client_payload.bottom_nav_enabled || 'no' }}"
-          BOTTOM_NAV_TABS="${{ github.event.client_payload.bottom_nav_tabs || '[]' }}"
-          BOTTOM_NAV_BG_COLOR="${{ github.event.client_payload.bottom_nav_bg_color || '#ffffff' }}"
-          BOTTOM_NAV_ACTIVE_COLOR="${{ github.event.client_payload.bottom_nav_active_color || '#6366f1' }}"
-          BOTTOM_NAV_INACTIVE_COLOR="${{ github.event.client_payload.bottom_nav_inactive_color || '#94a3b8' }}"
-          BOTTOM_NAV_STYLE="${{ github.event.client_payload.bottom_nav_style || 'full' }}"
-          
-          # Ensure tabs is valid JSON or fallback to empty array
-          if ! echo "$BOTTOM_NAV_TABS" | jq . >/dev/null 2>&1; then
-            BOTTOM_NAV_TABS="[]"
+          # If triggered via workflow_dispatch manually, create a dummy JSON
+          if [ -z "$CONFIG_JSON" ]; then
+            CONFIG_JSON="{\"site_url\":\"${{ github.event.inputs.site_url }}\",\"app_name\":\"${{ github.event.inputs.app_name }}\"}"
           fi
           
-          mkdir -p assets
-          cat > assets/config.json << EOF
-          {
-            "site_url": "${SITE_URL}",
-            "app_name": "${APP_NAME}",
-            "api_namespace": "appreso/v1",
-            "splash_type": "${SPLASH_TYPE}",
-            "splash_bg_color": "${SPLASH_BG_COLOR}",
-            "splash_show_name": "${SPLASH_SHOW_NAME}",
-            "splash_custom_text": "${SPLASH_CUSTOM_TEXT}",
-            "splash_text_color": "${SPLASH_TEXT_COLOR}",
-            "preloader_enabled": "${PRELOADER_ENABLED}",
-            "preloader_style": "${PRELOADER_STYLE}",
-            "preloader_color": "${PRELOADER_COLOR}",
-            "preloader_bg_color": "${PRELOADER_BG_COLOR}",
-            "pull_refresh": "${PULL_REFRESH}",
-            "pull_refresh_color": "${PULL_REFRESH_COLOR}",
-            "status_bar_color": "${STATUS_BAR_COLOR}",
-            "show_branding": "${SHOW_BRANDING}",
-            "offline_mode": "${OFFLINE_MODE}",
-            "app_version": "${APP_VERSION}",
-            "update_message": "${UPDATE_MESSAGE}",
-            "onesignal_app_id": "${ONESIGNAL_APP_ID}",
-            "deep_link_url": "${DEEP_LINK_URL}",
-            "bottom_nav_enabled": "${BOTTOM_NAV_ENABLED}",
-            "bottom_nav_tabs": ${BOTTOM_NAV_TABS},
-            "bottom_nav_bg_color": "${BOTTOM_NAV_BG_COLOR}",
-            "bottom_nav_active_color": "${BOTTOM_NAV_ACTIVE_COLOR}",
-            "bottom_nav_inactive_color": "${BOTTOM_NAV_INACTIVE_COLOR}",
-            "bottom_nav_style": "${BOTTOM_NAV_STYLE}"
-          }
-          EOF
+          # Write it to a file for jq to read
+          echo "$CONFIG_JSON" > payload.json
           
-          echo "Site URL: ${SITE_URL}"
-          echo "App Name: ${APP_NAME}"
+          # Generate the final assets/config.json for Flutter
+          mkdir -p assets
+          # Note: We just copy the payload as the config, ensuring api_namespace is set
+          jq '. + {"api_namespace": "appreso/v1"}' payload.json > assets/config.json
+          
+          # Extract key variables for bash scripts
+          echo "APP_NAME=$(jq -r '.app_name // "AppReso App"' payload.json)" >> $GITHUB_ENV
+          echo "SITE_URL=$(jq -r '.site_url // "https://example.com"' payload.json)" >> $GITHUB_ENV
+          echo "APP_ICON_URL=$(jq -r '.app_icon_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "SPLASH_SCREEN_URL=$(jq -r '.splash_screen_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "DEEP_LINK_URL=$(jq -r '.deep_link_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
       - name: Download and set App Icon
         run: |
-          ICON_URL="${{ github.event.client_payload.app_icon_url || '' }}"
-          
-          if [ -n "$ICON_URL" ] && [ "$ICON_URL" != "" ]; then
-            echo "Downloading app icon from: $ICON_URL"
-            mkdir -p assets
-            curl -L -o assets/app_icon.png "$ICON_URL"
+          if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
+            echo "Downloading app icon from: $APP_ICON_URL"
+            curl -L -o assets/app_icon.png "$APP_ICON_URL"
             
             # Install ImageMagick for icon resizing
             sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
@@ -158,19 +112,14 @@ jobs:
 
       - name: Download Splash Screen
         run: |
-          SPLASH_URL="${{ github.event.client_payload.splash_screen_url || '' }}"
-          
-          if [ -n "$SPLASH_URL" ] && [ "$SPLASH_URL" != "" ]; then
-            echo "Downloading splash screen from: $SPLASH_URL"
-            mkdir -p assets
-            curl -L -o assets/splash.png "$SPLASH_URL"
+          if [ -n "$SPLASH_SCREEN_URL" ] && [ "$SPLASH_SCREEN_URL" != "" ]; then
+            echo "Downloading splash screen from: $SPLASH_SCREEN_URL"
+            curl -L -o assets/splash.png "$SPLASH_SCREEN_URL"
             echo "Splash screen saved"
           fi
 
       - name: Set App Label in AndroidManifest.xml
         run: |
-          APP_NAME="${{ github.event.client_payload.app_name || github.event.inputs.app_name }}"
-          
           # Update the app label in AndroidManifest.xml
           sed -i "s/android:label=\"appreso_app\"/android:label=\"${APP_NAME}\"/g" android/app/src/main/AndroidManifest.xml
           
@@ -183,14 +132,10 @@ jobs:
 
       - name: Configure Deep Linking
         run: |
-          DEEP_LINK_URL="${{ github.event.client_payload.deep_link_url || '' }}"
-          
           if [ -n "$DEEP_LINK_URL" ] && [ "$DEEP_LINK_URL" != "" ]; then
             echo "Configuring deep link for: $DEEP_LINK_URL"
             
             # Extract scheme and host from URL (very basic parsing)
-            # e.g. https://example.com -> scheme=https, host=example.com
-            # e.g. myapp://open -> scheme=myapp, host=open
             SCHEME=$(echo "$DEEP_LINK_URL" | sed -E 's|^(.*)://.*|\1|')
             HOST=$(echo "$DEEP_LINK_URL" | sed -E 's|^.*://([^/]*).*|\1|')
             
@@ -213,10 +158,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ github.run_number }}"
-          name: "APK Build #${{ github.run_number }} - ${{ github.event.client_payload.app_name || github.event.inputs.app_name }}"
+          name: "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}"
           body: |
-            **App Name:** ${{ github.event.client_payload.app_name || github.event.inputs.app_name }}
-            **Site URL:** ${{ github.event.client_payload.site_url || github.event.inputs.site_url }}
+            **App Name:** ${{ env.APP_NAME }}
+            **Site URL:** ${{ env.SITE_URL }}
             **Built at:** ${{ github.event.repository.updated_at }}
           files: build/app/outputs/flutter-apk/app-release.apk
           draft: false
@@ -226,8 +171,6 @@ jobs:
 
       - name: Send callback to WordPress
         run: |
-          CALLBACK_URL="${{ github.event.client_payload.callback_url || '' }}"
-          CALLBACK_SECRET="${{ github.event.client_payload.callback_secret || '' }}"
           APK_URL="https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk"
           
           if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
@@ -243,12 +186,17 @@ jobs:
           fi
 
       - name: Send failure callback
-        if: failure() && github.event.client_payload.callback_url != ''
+        if: failure()
         run: |
-          CALLBACK_URL="${{ github.event.client_payload.callback_url }}"
-          CALLBACK_SECRET="${{ github.event.client_payload.callback_secret }}"
-          
-          curl -s -X POST "$CALLBACK_URL" \
-            -H "Content-Type: application/json" \
-            -H "X-AppReso-Secret: $CALLBACK_SECRET" \
-            -d '{"status": "failed", "error": "APK build failed. Check GitHub Actions logs."}'
+          # Read from payload.json directly since environment variables might not be available in failure step if config step failed
+          if [ -f payload.json ]; then
+            CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)
+            CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)
+            
+            if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
+              curl -s -X POST "$CALLBACK_URL" \
+                -H "Content-Type: application/json" \
+                -H "X-AppReso-Secret: $CALLBACK_SECRET" \
+                -d '{"status": "failed", "error": "APK build failed. Check GitHub Actions logs."}'
+            fi
+          fi
