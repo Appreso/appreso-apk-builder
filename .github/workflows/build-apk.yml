@@ -81,13 +81,17 @@ jobs:
           echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
           echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
-      - name: Update Gradle minSdkVersion
+      - name: Update Gradle minSdkVersion & Kotlin version
         run: |
           cd /tmp/appreso_build
           
           # Update minSdkVersion to 21 for flutter_inappwebview support
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
+          
+          # Update Kotlin version to 1.9.24 to support modern plugins like flutter_inappwebview
+          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.24"/g' android/settings.gradle 2>/dev/null || true
+          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.24"/g' android/build.gradle 2>/dev/null || true
 
       - name: Download and set App Icon
         run: |
