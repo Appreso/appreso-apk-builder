@@ -35,7 +35,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.24.x'
+          flutter-version: '3.22.3'
           cache: true
 
       - name: Create Pristine Flutter Project
@@ -47,9 +47,6 @@ jobs:
           cp -r lib /tmp/appreso_build/
           cp -r assets /tmp/appreso_build/ 2>/dev/null || true
           cp pubspec.yaml /tmp/appreso_build/
-          
-          # Force app_links to a version compatible with Flutter 3.24 Gradle template
-          sed -i 's/app_links: \^[6-9].*/app_links: ^7.2.1/g' /tmp/appreso_build/pubspec.yaml
 
       - name: Process Configuration Payload
         id: config
@@ -77,12 +74,15 @@ jobs:
           echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
           echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
-      - name: Update Gradle minSdkVersion
+      - name: Update Gradle minSdkVersion & Kotlin version
         run: |
           cd /tmp/appreso_build
           
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
+          
+          perl -pi -e 's/version\s+"1\.[0-9\.]+"/version "2.0.20"/ if /kotlin\.android/' android/settings.gradle 2>/dev/null || true
+          perl -pi -e 's/ext\.kotlin_version\s*=\s*.*/ext.kotlin_version = "2.0.20"/' android/build.gradle 2>/dev/null || true
 
       - name: Download and set App Icon
         run: |
