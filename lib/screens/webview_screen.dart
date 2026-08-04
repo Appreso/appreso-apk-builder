@@ -118,16 +118,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<void> _checkConnectivity() async {
     final connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
+    if (connectivityResult == ConnectivityResult.none) {
       setState(() {
         _isOffline = true;
       });
     }
 
-    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
+    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
       if (mounted) {
         setState(() {
-          _isOffline = result.contains(ConnectivityResult.none);
+          _isOffline = result == ConnectivityResult.none;
         });
         if (!_isOffline) {
           // Came back online, reload if needed
