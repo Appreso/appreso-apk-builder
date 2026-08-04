@@ -90,8 +90,8 @@ jobs:
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
           
           # Update Kotlin version to 1.9.24 to support modern plugins like flutter_inappwebview
-          sed -i 's/id "org.jetbrains.kotlin.android" version ".*"/id "org.jetbrains.kotlin.android" version "1.9.24"/g' android/settings.gradle 2>/dev/null || true
-          sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.24"/g' android/build.gradle 2>/dev/null || true
+          perl -pi -e 's/version\s+"1\.[0-9\.]+"/version "1.9.24"/ if /kotlin\.android/' android/settings.gradle 2>/dev/null || true
+          perl -pi -e 's/ext\.kotlin_version\s*=\s*.*/ext.kotlin_version = "1.9.24"/' android/build.gradle 2>/dev/null || true
 
       - name: Download and set App Icon
         run: |
