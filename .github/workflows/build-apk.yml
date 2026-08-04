@@ -35,22 +35,21 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.22.3'
+          flutter-version: '3.24.x'
           cache: true
 
       - name: Create Pristine Flutter Project
         run: |
-          # Instead of copying android/ to our repo, we create a fresh project
-          # and copy our code into it. This guarantees all hidden files (.metadata)
-          # and Gradle configurations are 100% correct for the current Flutter version.
+          # Create a fresh project
           flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/appreso_build
           
-          # Copy our custom source code into the fresh project
+          # Copy custom code
           cp -r lib /tmp/appreso_build/
           cp -r assets /tmp/appreso_build/ 2>/dev/null || true
           cp pubspec.yaml /tmp/appreso_build/
           
-          # We will do all further build steps inside /tmp/appreso_build
+          # Force app_links to a version compatible with Flutter 3.24 Gradle template
+          sed -i 's/app_links: \^[6-9].*/app_links: ^7.2.1/g' /tmp/appreso_build/pubspec.yaml
 
       - name: Process Configuration Payload
         id: config
@@ -61,18 +60,15 @@ jobs:
         run: |
           cd /tmp/appreso_build
           
-          # Safely write the JSON payload to a file
           if [ -z "$PAYLOAD_JSON" ]; then
             echo "{\"site_url\":\"$INPUT_SITE\",\"app_name\":\"$INPUT_NAME\"}" > payload.json
           else
             echo "$PAYLOAD_JSON" > payload.json
           fi
           
-          # Generate the final assets/config.json for Flutter
           mkdir -p assets
           jq '. + {"api_namespace": "appreso/v1"}' payload.json > assets/config.json
           
-          # Extract key variables for bash scripts
           echo "APP_NAME=$(jq -r '.app_name // "AppReso App"' payload.json)" >> $GITHUB_ENV
           echo "SITE_URL=$(jq -r '.site_url // "https://example.com"' payload.json)" >> $GITHUB_ENV
           echo "APP_ICON_URL=$(jq -r '.app_icon_url // empty' payload.json)" >> $GITHUB_ENV
@@ -81,17 +77,12 @@ jobs:
           echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
           echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
-      - name: Update Gradle minSdkVersion & Kotlin version
+      - name: Update Gradle minSdkVersion
         run: |
           cd /tmp/appreso_build
           
-          # Update minSdkVersion to 21 for flutter_inappwebview support
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
-          
-          # Update Kotlin version to 1.9.24 to support modern plugins like flutter_inappwebview
-          perl -pi -e 's/version\s+"1\.[0-9\.]+"/version "1.9.24"/ if /kotlin\.android/' android/settings.gradle 2>/dev/null || true
-          perl -pi -e 's/ext\.kotlin_version\s*=\s*.*/ext.kotlin_version = "1.9.24"/' android/build.gradle 2>/dev/null || true
 
       - name: Download and set App Icon
         run: |
