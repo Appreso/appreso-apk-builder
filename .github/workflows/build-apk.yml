@@ -105,18 +105,7 @@ jobs:
           sed -i 's/id "org.jetbrains.kotlin.android" version "2.0.20" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
           
           # 5. Fix JVM Target Compatibility (Align Java & Kotlin to Java 17)
-          cat << 'EOF' >> android/app/build.gradle
-
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-}
-EOF
+          printf "\nandroid {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    kotlinOptions {\n        jvmTarget = '17'\n    }\n}\n" >> android/app/build.gradle
           
           echo ""
           echo "=== AFTER PATCHING ==="
