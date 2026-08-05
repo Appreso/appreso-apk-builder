@@ -11,7 +11,6 @@ import '../services/verification_service.dart';
 import '../services/push_service.dart';
 import '../widgets/powered_by_badge.dart';
 import 'error_screen.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 class WebViewScreen extends StatefulWidget {
   final AppConfig config;
@@ -107,9 +106,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
   void _handleDeepLink(Uri uri) {
     if (!mounted) return;
     
-    // We navigate the WebView to the path/query of the deep link
-    // appended to our siteUrl, or just load the deep link URL directly 
-    // if the domain matches.
     final siteUri = Uri.parse(widget.config.siteUrl);
     if (uri.host == siteUri.host || uri.scheme.startsWith('appreso')) {
        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(uri.toString())));
@@ -130,7 +126,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
           _isOffline = result == ConnectivityResult.none;
         });
         if (!_isOffline) {
-          // Came back online, reload if needed
           webViewController?.reload();
         }
       }
@@ -366,7 +361,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Color.fromRGBO(0, 0, 0, 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 5),
               ),
