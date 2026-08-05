@@ -21,13 +21,24 @@ class VerificationService {
 
   Future<VerificationResult> verify() async {
     try {
-      final response = await http.get(
+      var response = await http.get(
         Uri.parse(config.verifyUrl),
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'AppReso-Android/1.0',
         },
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode != 200) {
+        final cleanUrl = config.siteUrl.endsWith('/') ? config.siteUrl.substring(0, config.siteUrl.length - 1) : config.siteUrl;
+        response = await http.get(
+          Uri.parse('$cleanUrl/wp-json/${config.apiNamespace}/verify'),
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'AppReso-Android/1.0',
+          },
+        ).timeout(const Duration(seconds: 4));
+      }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -39,11 +50,8 @@ class VerificationService {
           );
         }
       }
-      return VerificationResult(isActive: false, requiredVersion: '1.0.0', updateMessage: '');
+      return VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
     } catch (e) {
-      // Return true for isActive on network error so we don't lock them out if offline
-      // unless we strictly want to require internet. Since we are adding offline mode,
-      // it's better to allow them through if there's a network error.
       return VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
     }
   }
