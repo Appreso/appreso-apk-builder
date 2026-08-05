@@ -90,12 +90,12 @@ jobs:
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle 2>/dev/null || true
           
-          # 2. Update Kotlin version to 2.2.0
-          #    The GitHub runner's Gradle cache contains kotlin-stdlib 2.2.20 (metadata 2.2.0)
-          #    so we MUST use Kotlin compiler >= 2.2.0 to read that metadata.
-          #    Flutter 3.22.3 defaults to Kotlin 1.7.10 which is far too old.
+          # 2. Update AGP version to 8.1.0 (Kotlin 2.2.0 requires AGP >= 7.3.1, default was 7.3.0)
+          sed -i 's/id "com.android.application" version "7.3.0" apply false/id "com.android.application" version "8.1.0" apply false/g' android/settings.gradle 2>/dev/null || true
+          sed -i 's/id "com.android.application" version "[^"]*" apply false/id "com.android.application" version "8.1.0" apply false/g' android/settings.gradle 2>/dev/null || true
+          
+          # 3. Update Kotlin version to 2.2.0
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.7.10" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          # Fallback patterns in case the exact string differs
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.8.22" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
