@@ -112,6 +112,18 @@ class AppConfig {
     return AppConfig.fromJson(jsonMap);
   }
 
-  String get verifyUrl => '$siteUrl/wp-json/$apiNamespace/verify';
-  String get siteInfoUrl => '$siteUrl/wp-json/$apiNamespace/site-info';
+  String get verifyUrl {
+    final cleanUrl = siteUrl.endsWith('/') ? siteUrl.substring(0, siteUrl.length - 1) : siteUrl;
+    return '$cleanUrl/index.php?rest_route=/$apiNamespace/verify';
+  }
+
+  String get siteInfoUrl {
+    final cleanUrl = siteUrl.endsWith('/') ? siteUrl.substring(0, siteUrl.length - 1) : siteUrl;
+    return '$cleanUrl/index.php?rest_route=/$apiNamespace/site-info';
+  }
+
+  String get analyticsUrl {
+    final cleanUrl = siteUrl.endsWith('/') ? siteUrl.substring(0, siteUrl.length - 1) : siteUrl;
+    return '$cleanUrl/index.php?rest_route=/$apiNamespace/analytics/event';
+  }
 }
