@@ -40,10 +40,9 @@ jobs:
 
       - name: Create Pristine Flutter Project
         run: |
-          # Create a fresh project
           flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/appreso_build
           
-          # Copy custom code
+          # Copy custom code into the fresh project
           cp -r lib /tmp/appreso_build/
           cp -r assets /tmp/appreso_build/ 2>/dev/null || true
           cp pubspec.yaml /tmp/appreso_build/
@@ -74,16 +73,42 @@ jobs:
           echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
           echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
 
-      - name: Update Gradle minSdkVersion & Kotlin version
+      - name: Patch Android Build Configuration
         run: |
           cd /tmp/appreso_build
           
+          echo "=== BEFORE PATCHING ==="
+          echo "--- settings.gradle ---"
+          cat android/settings.gradle
+          echo ""
+          echo "--- app/build.gradle (minSdkVersion lines) ---"
+          grep -n "minSdkVersion" android/app/build.gradle || true
+          echo "========================"
+          
+          # 1. Update minSdkVersion to 21 (required by flutter_inappwebview)
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle.kts 2>/dev/null || true
-          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.0.20"/g' android/settings.gradle 2>/dev/null || true
-          sed -i "s/id 'org.jetbrains.kotlin.android' version '[^']*'/id 'org.jetbrains.kotlin.android' version '2.0.20'/g" android/settings.gradle 2>/dev/null || true
-          sed -i 's/ext.kotlin_version = "[^"]*"/ext.kotlin_version = "2.0.20"/g' android/build.gradle 2>/dev/null || true
-          sed -i "s/ext.kotlin_version = '[^']*'/ext.kotlin_version = '2.0.20'/g" android/build.gradle 2>/dev/null || true
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle 2>/dev/null || true
+          
+          # 2. Update Kotlin version to 2.2.0
+          #    The GitHub runner's Gradle cache contains kotlin-stdlib 2.2.20 (metadata 2.2.0)
+          #    so we MUST use Kotlin compiler >= 2.2.0 to read that metadata.
+          #    Flutter 3.22.3 defaults to Kotlin 1.7.10 which is far too old.
+          sed -i 's/id "org.jetbrains.kotlin.android" version "1.7.10" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
+          # Fallback patterns in case the exact string differs
+          sed -i 's/id "org.jetbrains.kotlin.android" version "1.8.22" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
+          sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
+          sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
+          sed -i 's/id "org.jetbrains.kotlin.android" version "2.0.20" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
+          
+          echo ""
+          echo "=== AFTER PATCHING ==="
+          echo "--- settings.gradle ---"
+          cat android/settings.gradle
+          echo ""
+          echo "--- app/build.gradle (minSdkVersion lines) ---"
+          grep -n "minSdk" android/app/build.gradle || true
+          echo "========================"
 
       - name: Download and set App Icon
         run: |
@@ -143,10 +168,10 @@ jobs:
       - name: Build Release APK
         run: |
           cd /tmp/appreso_build
+          flutter clean
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
           
-          # Copy the built APK back to the workspace so GitHub Actions can upload it
           mkdir -p $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
           cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
 
@@ -181,7 +206,6 @@ jobs:
       - name: Send failure callback
         if: failure()
         run: |
-          # Fallback to reading from the workspace or /tmp
           if [ -f /tmp/appreso_build/payload.json ]; then
             CALLBACK_URL=$(jq -r '.callback_url // empty' /tmp/appreso_build/payload.json)
             CALLBACK_SECRET=$(jq -r '.callback_secret // empty' /tmp/appreso_build/payload.json)
