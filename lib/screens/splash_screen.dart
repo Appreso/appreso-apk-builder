@@ -42,40 +42,47 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _checkVerification() async {
     final verificationService = VerificationService(widget.config);
     
-    // Ensure splash is visible for at least 2 seconds
-    final results = await Future.wait([
-      verificationService.verify(),
-      PackageInfo.fromPlatform(),
-      _trackAnalyticsOpen(),
-      Future.delayed(const Duration(seconds: 2)),
-    ]);
+    // Fire analytics in background without blocking splash screen!
+    _trackAnalyticsOpen();
 
-    final VerificationResult verification = results[0] as VerificationResult;
-    final PackageInfo packageInfo = results[1] as PackageInfo;
+    try {
+      final results = await Future.wait([
+        verificationService.verify().timeout(const Duration(seconds: 5)),
+        PackageInfo.fromPlatform().timeout(const Duration(seconds: 3)),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
 
-    if (!mounted) return;
+      final VerificationResult verification = results[0] as VerificationResult;
+      final PackageInfo packageInfo = results[1] as PackageInfo;
 
-    if (!verification.isActive) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ErrorScreen(
-            config: widget.config,
-            errorMessage: 'The plugin is not active on this website. Please contact the site administrator to re-activate the AppReso plugin.',
+      if (!mounted) return;
+
+      if (!verification.isActive) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ErrorScreen(
+              config: widget.config,
+              errorMessage: 'The plugin is not active on this website. Please contact the site administrator to re-activate the AppReso plugin.',
+            ),
           ),
-        ),
+        );
+        return;
+      }
+
+      // Force Update Check
+      if (_isUpdateRequired(packageInfo.version, verification.requiredVersion)) {
+        _showUpdateDialog(verification.updateMessage);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Splash check exception: $e');
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => WebViewScreen(config: widget.config)),
       );
-      return;
     }
-
-    // Force Update Check
-    if (_isUpdateRequired(packageInfo.version, verification.requiredVersion)) {
-      _showUpdateDialog(verification.updateMessage);
-      return; // Do not navigate to WebView
-    }
-
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => WebViewScreen(config: widget.config)),
-    );
   }
 
   bool _isUpdateRequired(String current, String required) {
@@ -89,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
       return false;
     } catch (e) {
-      return false; // Fallback
+      return false;
     }
   }
 
@@ -121,15 +128,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         await prefs.setString('appreso_device_id', deviceId);
       }
 
-      final url = '${widget.config.siteUrl}/wp-json/${widget.config.apiNamespace}/analytics/event';
       await http.post(
-        Uri.parse(url),
+        Uri.parse(widget.config.analyticsUrl),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'event': 'app_open',
           'device_id': deviceId,
         }),
-      );
+      ).timeout(const Duration(seconds: 3));
     } catch (e) {
       // Silently fail if analytics can't be sent
     }
