@@ -44,7 +44,7 @@ class _PoweredByBadgeState extends State<PoweredByBadge> with SingleTickerProvid
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.8),
+            color: const Color.fromRGBO(255, 255, 255, 0.8),
             borderRadius: BorderRadius.circular(4),
           ),
           child: const Text(
