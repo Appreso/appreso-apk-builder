@@ -51,7 +51,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       );
     }
 
-    // Periodic verification every 30 minutes
     _verificationTimer = Timer.periodic(const Duration(minutes: 30), (timer) async {
       final verificationService = VerificationService(widget.config);
       final result = await verificationService.verify();
@@ -84,8 +83,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   Future<void> _initDeepLinks() async {
     _appLinks = AppLinks();
-    
-    // Check initial link if app was in cold state (terminated)
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
@@ -95,7 +92,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       debugPrint("Failed to get initial deep link");
     }
 
-    // Handle link when app is in warm state (foreground/background)
     _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
       _handleDeepLink(uri);
     }, onError: (err) {
@@ -105,7 +101,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   void _handleDeepLink(Uri uri) {
     if (!mounted) return;
-    
     final siteUri = Uri.parse(widget.config.siteUrl);
     if (uri.host == siteUri.host || uri.scheme.startsWith('appreso')) {
        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(uri.toString())));
@@ -140,23 +135,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
     super.dispose();
   }
 
-  void _showToast(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _handleError(String? url, int? code, String? description) {
     if (!mounted) return;
+    _finishLoading();
     setState(() {
       _isVerificationFailed = true;
       _lastFailedUrl = url;
     });
-    _showToast("Error $code: $description");
   }
 
   void _finishLoading() {
@@ -192,7 +177,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (currentBackPressTime == null || 
             now.difference(currentBackPressTime!) > const Duration(seconds: 2)) {
           currentBackPressTime = now;
-          _showToast("Press back again to exit");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Press back again to exit"), duration: Duration(seconds: 2)),
+          );
         } else {
           SystemNavigator.pop();
         }
@@ -228,6 +215,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 onLoadStart: (controller, url) {
                   setState(() {
                     _progress = 0;
+                    _isVerificationFailed = false;
                     if (widget.config.preloaderEnabled == 'yes') {
                       _isLoading = true;
                     }
@@ -302,6 +290,56 @@ class _WebViewScreenState extends State<WebViewScreen> {
                     ),
                   ),
                 ),
+
+              if (_isVerificationFailed)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.white,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.wifi_off_rounded, size: 64, color: Colors.grey.shade400),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Failed to load page',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Please check your internet connection and try again.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isVerificationFailed = false;
+                                  _isLoading = true;
+                                });
+                                final retryUrl = _lastFailedUrl ?? widget.config.siteUrl;
+                                webViewController?.loadUrl(
+                                  urlRequest: URLRequest(url: WebUri(retryUrl)),
+                                );
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6366f1),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 
               if (widget.config.showBranding == 'yes')
                 const Positioned(
@@ -312,185 +350,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
             ],
           ),
         ),
-        bottomNavigationBar: _buildBottomNavigationBar(),
       ),
     );
-  }
-
-  Widget? _buildBottomNavigationBar() {
-    if (!widget.config.bottomNavEnabled || widget.config.bottomNavTabs.isEmpty) {
-      return null;
-    }
-
-    final tabs = widget.config.bottomNavTabs;
-    final bgColor = AppConfig.hexToColor(widget.config.bottomNavBgColor);
-    final activeColor = AppConfig.hexToColor(widget.config.bottomNavActiveColor);
-    final inactiveColor = AppConfig.hexToColor(widget.config.bottomNavInactiveColor);
-    
-    Widget navBar = BottomNavigationBar(
-      currentIndex: _currentTabIndex,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: widget.config.bottomNavStyle == 'floating' ? Colors.transparent : bgColor,
-      elevation: 0,
-      selectedItemColor: activeColor,
-      unselectedItemColor: inactiveColor,
-      showSelectedLabels: true,
-      showUnselectedLabels: true,
-      onTap: (index) {
-        setState(() {
-          _currentTabIndex = index;
-        });
-        final url = tabs[index]['url'] as String;
-        final targetUrl = Uri.parse(widget.config.siteUrl).resolve(url).toString();
-        webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(targetUrl)));
-      },
-      items: tabs.map<BottomNavigationBarItem>((tab) {
-        return BottomNavigationBarItem(
-          icon: Icon(_getIconForString(tab['icon']?.toString() ?? '')),
-          label: tab['label']?.toString() ?? '',
-        );
-      }).toList(),
-    );
-
-    if (widget.config.bottomNavStyle == 'floating') {
-      return SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Color.fromRGBO(0, 0, 0, 0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: navBar,
-          ),
-        ),
-      );
-    }
-
-    return navBar;
-  }
-
-  IconData _getIconForString(String iconName) {
-    switch (iconName.toLowerCase()) {
-      case 'home': return Icons.home;
-      case 'search': return Icons.search;
-      case 'settings': return Icons.settings;
-      case 'account_circle': return Icons.account_circle;
-      case 'shopping_cart': return Icons.shopping_cart;
-      case 'favorite': return Icons.favorite;
-      case 'star': return Icons.star;
-      case 'notifications': return Icons.notifications;
-      case 'info': return Icons.info;
-      case 'menu': return Icons.menu;
-      case 'mail': return Icons.mail;
-      case 'phone': return Icons.phone;
-      case 'location_on': return Icons.location_on;
-      case 'chat': return Icons.chat;
-      case 'camera_alt': return Icons.camera_alt;
-      case 'image': return Icons.image;
-      case 'article': return Icons.article;
-      case 'share': return Icons.share;
-      case 'language': return Icons.language;
-      case 'dashboard': return Icons.dashboard;
-      case 'edit': return Icons.edit;
-      case 'delete': return Icons.delete;
-      case 'add': return Icons.add;
-      case 'check': return Icons.check;
-      case 'close': return Icons.close;
-      case 'arrow_back': return Icons.arrow_back;
-      case 'arrow_forward': return Icons.arrow_forward;
-      case 'local_shipping': return Icons.local_shipping;
-      case 'payment': return Icons.payment;
-      case 'event': return Icons.event;
-      case 'history': return Icons.history;
-      case 'description': return Icons.description;
-      case 'list': return Icons.list;
-      case 'category': return Icons.category;
-      case 'store': return Icons.store;
-      case 'business': return Icons.business;
-      case 'flight': return Icons.flight;
-      case 'hotel': return Icons.hotel;
-      case 'restaurant': return Icons.restaurant;
-      case 'directions_car': return Icons.directions_car;
-      case 'local_hospital': return Icons.local_hospital;
-      case 'school': return Icons.school;
-      case 'work': return Icons.work;
-      case 'group': return Icons.group;
-      case 'person': return Icons.person;
-      case 'thumb_up': return Icons.thumb_up;
-      case 'thumb_down': return Icons.thumb_down;
-      case 'visibility': return Icons.visibility;
-      case 'lock': return Icons.lock;
-      case 'key': return Icons.key;
-      case 'wifi': return Icons.wifi;
-      case 'battery_full': return Icons.battery_full;
-      case 'build': return Icons.build;
-      case 'bug_report': return Icons.bug_report;
-      case 'code': return Icons.code;
-      case 'help': return Icons.help;
-      case 'warning': return Icons.warning;
-      case 'error': return Icons.error;
-      case 'lightbulb': return Icons.lightbulb;
-      case 'attach_file': return Icons.attach_file;
-      case 'mic': return Icons.mic;
-      case 'videocam': return Icons.videocam;
-      case 'play_arrow': return Icons.play_arrow;
-      case 'pause': return Icons.pause;
-      case 'stop': return Icons.stop;
-      case 'volume_up': return Icons.volume_up;
-      case 'music_note': return Icons.music_note;
-      case 'movie': return Icons.movie;
-      case 'tv': return Icons.tv;
-      case 'sports_esports': return Icons.sports_esports;
-      case 'casino': return Icons.casino;
-      case 'fitness_center': return Icons.fitness_center;
-      case 'spa': return Icons.spa;
-      case 'pets': return Icons.pets;
-      case 'explore': return Icons.explore;
-      case 'map': return Icons.map;
-      case 'place': return Icons.place;
-      case 'local_offer': return Icons.local_offer;
-      case 'sell': return Icons.sell;
-      case 'shopping_bag': return Icons.shopping_bag;
-      case 'receipt': return Icons.receipt;
-      case 'account_balance': return Icons.account_balance;
-      case 'credit_card': return Icons.credit_card;
-      case 'monetization_on': return Icons.monetization_on;
-      case 'trending_up': return Icons.trending_up;
-      case 'analytics': return Icons.analytics;
-      case 'bar_chart': return Icons.bar_chart;
-      case 'pie_chart': return Icons.pie_chart;
-      case 'science': return Icons.science;
-      case 'emoji_emotions': return Icons.emoji_emotions;
-      case 'sentiment_satisfied': return Icons.sentiment_satisfied;
-      case 'water_drop': return Icons.water_drop;
-      case 'eco': return Icons.eco;
-      case 'wb_sunny': return Icons.wb_sunny;
-      case 'nightlight_round': return Icons.nightlight_round;
-      case 'cloud': return Icons.cloud;
-      case 'ac_unit': return Icons.ac_unit;
-      case 'fire_extinguisher': return Icons.fire_extinguisher;
-      case 'local_fire_department': return Icons.local_fire_department;
-      case 'security': return Icons.security;
-      case 'shield': return Icons.shield;
-      case 'policy': return Icons.policy;
-      case 'gavel': return Icons.gavel;
-      case 'apartment': return Icons.apartment;
-      case 'house': return Icons.house;
-      case 'domain': return Icons.domain;
-      case 'public': return Icons.public;
-      case 'rocket_launch': return Icons.rocket_launch;
-      case 'airport_shuttle': return Icons.airport_shuttle;
-      default: return Icons.circle;
-    }
   }
 }
 
