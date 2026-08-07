@@ -8,21 +8,32 @@ import 'services/push_service.dart';
 void main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    final config = await AppConfig.load();
     
-    // Initialize OneSignal Push Notifications if App ID is provided
+    AppConfig config;
+    try {
+      config = await AppConfig.load();
+    } catch (e) {
+      debugPrint('Config load error: $e');
+      config = AppConfig.defaultConfig();
+    }
+    
+    // Initialize OneSignal Push Notifications safely
     if (config.onesignalAppId.isNotEmpty) {
-      OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-      OneSignal.initialize(config.onesignalAppId);
-      OneSignal.Notifications.requestPermission(true);
+      try {
+        OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+        OneSignal.initialize(config.onesignalAppId);
+        OneSignal.Notifications.requestPermission(true);
 
-      OneSignal.Notifications.addClickListener((event) {
-        final additionalData = event.notification.additionalData;
-        if (additionalData != null && additionalData.containsKey('launchURL')) {
-          final url = additionalData['launchURL'] as String?;
-          pushService.handleNotificationClick(url);
-        }
-      });
+        OneSignal.Notifications.addClickListener((event) {
+          final additionalData = event.notification.additionalData;
+          if (additionalData != null && additionalData.containsKey('launchURL')) {
+            final url = additionalData['launchURL'] as String?;
+            pushService.handleNotificationClick(url);
+          }
+        });
+      } catch (e) {
+        debugPrint('OneSignal init error: $e');
+      }
     }
     
     runApp(AppResoApp(config: config));
