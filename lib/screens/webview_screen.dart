@@ -118,20 +118,28 @@ class _WebViewScreenState extends State<WebViewScreen> {
   Future<void> _checkConnectivity() async {
     try {
       final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult.contains(ConnectivityResult.none)) {
+      if (connectivityResult == ConnectivityResult.none) {
         setState(() {
           _isOffline = true;
+          _isVerificationFailed = true;
+          _isLoading = false;
         });
       }
 
-      Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
         if (mounted) {
           setState(() {
-            _isOffline = results.contains(ConnectivityResult.none);
+            _isOffline = result == ConnectivityResult.none;
+            if (!_isOffline && _isVerificationFailed) {
+              // Retry loading when connection is restored
+              _isVerificationFailed = false;
+              _isLoading = true;
+              final retryUrl = _lastFailedUrl ?? widget.config.siteUrl;
+              webViewController?.loadUrl(
+                urlRequest: URLRequest(url: WebUri(retryUrl)),
+              );
+            }
           });
-          if (!_isOffline) {
-            webViewController?.reload();
-          }
         }
       });
     } catch (e) {
