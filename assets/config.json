@@ -1,0 +1,17 @@
+{
+  "site_url": "https://example.com",
+  "app_name": "AppReso App",
+  "api_namespace": "appreso/v1",
+  "splash_type": "color",
+  "splash_bg_color": "#6366f1",
+  "splash_show_name": "yes",
+  "splash_text_color": "#ffffff",
+  "preloader_enabled": "yes",
+  "preloader_style": "circular",
+  "preloader_color": "#6366f1",
+  "preloader_bg_color": "#ffffff",
+  "pull_refresh": "yes",
+  "pull_refresh_color": "#6366f1",
+  "status_bar_color": "#6366f1",
+  "show_branding": "yes"
+}
