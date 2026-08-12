@@ -50,15 +50,25 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     PackageInfo? packageInfo;
     
     try {
-      // Run verification and package info separately so one failure doesn't block the other
+      // Run verification and package info in parallel
       final verifyFuture = verificationService.verify().timeout(const Duration(seconds: 4));
       final packageFuture = PackageInfo.fromPlatform().timeout(const Duration(seconds: 3));
       
       // Minimum splash display time
       await Future.delayed(const Duration(seconds: 2));
       
-      verification = await verifyFuture.catchError((e) => VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: ''));
-      packageInfo = await packageFuture.catchError((e) => PackageInfo(appName: '', packageName: '', version: '1.0.0', buildNumber: '1'));
+      try {
+        verification = await verifyFuture;
+      } catch (e) {
+        debugPrint('Verification failed: $e');
+        verification = VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
+      }
+      
+      try {
+        packageInfo = await packageFuture;
+      } catch (e) {
+        debugPrint('PackageInfo failed: $e');
+      }
     } catch (e) {
       debugPrint('Splash check exception: $e');
     }
@@ -94,7 +104,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   bool _isUpdateRequired(String current, String required) {
     try {
-      final currentParts = current.split('.').map(int.parse).toList();
+      final cleanCurrent = current.split('+')[0];
+      final currentParts = cleanCurrent.split('.').map(int.parse).toList();
       final requiredParts = required.split('.').map(int.parse).toList();
       for (var i = 0; i < requiredParts.length; i++) {
         if (i >= currentParts.length) return true;
