@@ -77,7 +77,15 @@ jobs:
         run: |
           cd /tmp/appreso_build
           
-          # 1. Update minSdkVersion to 21
+          echo "=== BEFORE PATCHING ==="
+          echo "--- settings.gradle ---"
+          cat android/settings.gradle
+          echo ""
+          echo "--- app/build.gradle (minSdkVersion lines) ---"
+          grep -n "minSdkVersion" android/app/build.gradle || true
+          echo "========================"
+          
+          # 1. Update minSdkVersion to 21 (required by flutter_inappwebview)
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle 2>/dev/null || true
@@ -85,7 +93,7 @@ jobs:
           # 2. Update Gradle Wrapper to 8.3
           sed -i 's/gradle-[0-9.]*-/gradle-8.3-/g' android/gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
           
-          # 3. Update AGP version to 7.4.2
+          # 3. Update AGP version to 7.4.2 (Kotlin 2.2.0 requires AGP >= 7.3.1, default 7.3.0)
           sed -i 's/id "com.android.application" version "7.3.0" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
           sed -i 's/id "com.android.application" version "[^"]*" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
           
@@ -96,15 +104,26 @@ jobs:
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
           sed -i 's/id "org.jetbrains.kotlin.android" version "2.0.20" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
           
-          # 5. Fix JVM Target Compatibility (Java 17)
+          # 5. Fix JVM Target Compatibility (Align Java & Kotlin to Java 17)
           printf "\nandroid {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    kotlinOptions {\n        jvmTarget = '17'\n    }\n}\n" >> android/app/build.gradle
+          
+          echo ""
+          echo "=== AFTER PATCHING ==="
+          echo "--- settings.gradle ---"
+          cat android/settings.gradle
+          echo ""
+          echo "--- app/build.gradle (minSdkVersion lines) ---"
+          grep -n "minSdk" android/app/build.gradle || true
+          echo "========================"
 
       - name: Download and set App Icon
         run: |
           cd /tmp/appreso_build
           
           if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
+            echo "Downloading app icon from: $APP_ICON_URL"
             curl -L -o assets/app_icon.png "$APP_ICON_URL"
+            
             sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
             
             ICON_DIRS=(
@@ -134,10 +153,26 @@ jobs:
         run: |
           cd /tmp/appreso_build
           
+          # Set App Label
           sed -i "s|android:label=\"appreso_app\"|android:label=\"${APP_NAME}\"|g" android/app/src/main/AndroidManifest.xml
           
+          # Internet Permission & Cleartext Traffic (allows HTTP sites on Android 9+)
           if ! grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          fi
+          
+          if ! grep -q 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml; then
+            sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
+          fi
+          
+          # Deep Linking
+          if [ -n "$DEEP_LINK_URL" ] && [ "$DEEP_LINK_URL" != "" ]; then
+            SCHEME=$(echo "$DEEP_LINK_URL" | sed -E 's|^(.*)://.*|\1|')
+            HOST=$(echo "$DEEP_LINK_URL" | sed -E 's|^.*://([^/]*).*|\1|')
+            
+            INTENT_FILTER="<intent-filter android:autoVerify=\"true\">\n<action android:name=\"android.intent.action.VIEW\" />\n<category android:name=\"android.intent.category.DEFAULT\" />\n<category android:name=\"android.intent.category.BROWSABLE\" />\n<data android:scheme=\"$SCHEME\" android:host=\"$HOST\" />\n</intent-filter>"
+            
+            sed -i "/<\/activity>/i $INTENT_FILTER" android/app/src/main/AndroidManifest.xml
           fi
 
       - name: Build Release APK
