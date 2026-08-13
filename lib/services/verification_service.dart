@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 
@@ -50,8 +52,20 @@ class VerificationService {
           );
         }
       }
+
+      // Server responded but the verify endpoint returned non-200
+      // (e.g. 404 means plugin is deactivated) — mark as NOT active
+      debugPrint('Verification endpoint returned status: ${response.statusCode}');
+      return VerificationResult(isActive: false, requiredVersion: '1.0.0', updateMessage: '');
+
+    } on TimeoutException {
+      // Timeout — server is slow, allow app to work
+      debugPrint('Verification timed out, allowing app to continue');
       return VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
     } catch (e) {
+      // Network error (no internet, DNS failure, etc.)
+      // Can't reach server at all — allow app to work offline
+      debugPrint('Verification network error: $e');
       return VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
     }
   }
