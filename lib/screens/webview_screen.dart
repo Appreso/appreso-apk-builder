@@ -299,14 +299,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
                 },
               ),
               
-              // Top-positioned navigation bar
-              if (widget.config.bottomNavPosition == 'top' && widget.config.bottomNavEnabled && widget.config.bottomNavTabs.isNotEmpty)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildBottomNavigationBar() ?? const SizedBox.shrink(),
-                ),
+              // Navigation Bar overlay (Positioned in Stack for true floating margins)
+              if (widget.config.bottomNavEnabled && widget.config.bottomNavTabs.isNotEmpty)
+                _buildPositionedNavigationBar(),
                 
               if (widget.config.preloaderEnabled != 'yes' && _progress < 1.0)
                 Positioned(
@@ -354,7 +349,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ),
                 ),
 
-              // Error Retry Overlay
+              // Error Retry Overlay — shown when page fails to load
               if (_isVerificationFailed)
                 Positioned.fill(
                   child: Container(
@@ -414,110 +409,141 @@ class _WebViewScreenState extends State<WebViewScreen> {
             ],
           ),
         ),
-        bottomNavigationBar: widget.config.bottomNavPosition != 'top' ? _buildBottomNavigationBar() : null,
       ),
     );
   }
 
-  Widget? _buildBottomNavigationBar() {
-    if (!widget.config.bottomNavEnabled || widget.config.bottomNavTabs.isEmpty) {
-      return null;
-    }
+  Widget _buildPositionedNavigationBar() {
+    final isTop = widget.config.bottomNavPosition == 'top';
+    final isFloating = widget.config.bottomNavStyle == 'floating';
+    final marginLeft = isFloating ? widget.config.bottomNavMarginLeft : 0.0;
+    final marginRight = isFloating ? widget.config.bottomNavMarginRight : 0.0;
+    final marginEdge = isFloating ? widget.config.bottomNavMarginBottom : 0.0;
 
+    return Positioned(
+      top: isTop ? marginEdge : null,
+      bottom: !isTop ? marginEdge : null,
+      left: marginLeft,
+      right: marginRight,
+      child: _buildNavigationBarContent(),
+    );
+  }
+
+  Widget _buildNavigationBarContent() {
     final tabs = widget.config.bottomNavTabs;
     final bgColor = AppConfig.hexToColor(widget.config.bottomNavBgColor);
     final activeColor = AppConfig.hexToColor(widget.config.bottomNavActiveColor);
     final inactiveColor = AppConfig.hexToColor(widget.config.bottomNavInactiveColor);
     final showLabels = widget.config.bottomNavShowLabels == 'yes';
     final iconSize = widget.config.bottomNavIconSize;
-    
-    Widget navBar = BottomNavigationBar(
-      currentIndex: _currentTabIndex,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: widget.config.bottomNavStyle == 'floating' ? Colors.transparent : bgColor,
-      elevation: widget.config.bottomNavStyle == 'floating' ? 0 : (widget.config.bottomNavShadow == 'yes' ? widget.config.bottomNavElevation : 0),
-      selectedItemColor: activeColor,
-      unselectedItemColor: inactiveColor,
-      showSelectedLabels: showLabels,
-      showUnselectedLabels: showLabels,
-      selectedFontSize: showLabels ? 12 : 0,
-      unselectedFontSize: showLabels ? 12 : 0,
-      iconSize: iconSize,
-      onTap: (index) {
-        final tab = tabs[index];
-        final subMenuRaw = tab['sub_menu'];
-        List<dynamic> subMenu = [];
-        if (subMenuRaw is List && subMenuRaw.isNotEmpty) {
-          subMenu = subMenuRaw;
-        }
+    final isFloating = widget.config.bottomNavStyle == 'floating';
+    final borderRadius = isFloating ? widget.config.bottomNavBorderRadius : 0.0;
+    final hasShadow = widget.config.bottomNavShadow == 'yes';
+    final elevation = widget.config.bottomNavElevation;
 
-        if (subMenu.isNotEmpty) {
-          _showSubMenuBottomSheet(tab['label']?.toString() ?? '', subMenu);
-        } else {
-          setState(() {
-            _currentTabIndex = index;
-          });
-          final url = tabs[index]['url'] as String? ?? '';
-          if (url.isNotEmpty) {
-            final targetUrl = Uri.parse(widget.config.siteUrl).resolve(url).toString();
-            webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(targetUrl)));
-          }
-        }
-      },
-      items: tabs.map<BottomNavigationBarItem>((tab) {
-        return BottomNavigationBarItem(
-          icon: Icon(_getIconForString(tab['icon']?.toString() ?? ''), size: iconSize),
-          label: tab['label']?.toString() ?? '',
-        );
-      }).toList(),
-    );
+    Widget navItems = Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: hasShadow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: elevation * 2,
+                  offset: Offset(0, isFloating ? elevation / 2 : -elevation / 3),
+                ),
+              ]
+            : [],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: Material(
+          color: Colors.transparent,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: showLabels ? 6 : 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(tabs.length, (index) {
+                final tab = tabs[index];
+                final isSelected = _currentTabIndex == index;
+                final itemColor = isSelected ? activeColor : inactiveColor;
+                final iconName = tab['icon']?.toString() ?? 'admin-home';
+                final label = tab['label']?.toString() ?? '';
 
-    if (widget.config.bottomNavStyle == 'floating') {
-      final marginLeft = widget.config.bottomNavMarginLeft;
-      final marginRight = widget.config.bottomNavMarginRight;
-      final marginBottom = widget.config.bottomNavMarginBottom;
-      final borderRadius = widget.config.bottomNavBorderRadius;
-      final hasShadow = widget.config.bottomNavShadow == 'yes';
-      final elevation = widget.config.bottomNavElevation;
+                return Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      final subMenuRaw = tab['sub_menu'];
+                      List<dynamic> subMenu = [];
+                      if (subMenuRaw is List && subMenuRaw.isNotEmpty) {
+                        subMenu = subMenuRaw;
+                      }
 
-      navBar = SafeArea(
-        child: Container(
-          margin: EdgeInsets.only(left: marginLeft, right: marginRight, bottom: marginBottom),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(borderRadius),
-            boxShadow: hasShadow
-                ? [
-                    BoxShadow(
-                      color: const Color.fromRGBO(0, 0, 0, 0.1),
-                      blurRadius: elevation * 2.5,
-                      offset: Offset(0, elevation / 2),
+                      if (subMenu.isNotEmpty) {
+                        _showSubMenuBottomSheet(label, subMenu);
+                      } else {
+                        setState(() {
+                          _currentTabIndex = index;
+                        });
+                        final url = tab['url'] as String? ?? '';
+                        if (url.isNotEmpty) {
+                          final targetUrl = Uri.parse(widget.config.siteUrl).resolve(url).toString();
+                          webViewController?.loadUrl(urlRequest: URLRequest(url: WebUri(targetUrl)));
+                        }
+                      }
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _getIconForString(iconName),
+                          size: iconSize,
+                          color: itemColor,
+                        ),
+                        if (showLabels && label.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: itemColor,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ]
-                : [],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(borderRadius),
-            child: navBar,
+                  ),
+                );
+              }),
+            ),
           ),
         ),
-      );
-    }
+      ),
+    );
 
+    // Apply Hide on Scroll animation
     if (widget.config.bottomNavHideOnScroll == 'yes') {
+      final slideOffset = widget.config.bottomNavPosition == 'top'
+          ? (_isNavBarVisible ? Offset.zero : const Offset(0, -1.8))
+          : (_isNavBarVisible ? Offset.zero : const Offset(0, 1.8));
+
       return AnimatedSlide(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        offset: _isNavBarVisible ? Offset.zero : const Offset(0, 1),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOutCubic,
+        offset: slideOffset,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
           opacity: _isNavBarVisible ? 1.0 : 0.0,
-          child: navBar,
+          child: navItems,
         ),
       );
     }
 
-    return navBar;
+    return navItems;
   }
 
   void _showSubMenuBottomSheet(String title, List<dynamic> subMenu) {
@@ -723,118 +749,235 @@ class _WebViewScreenState extends State<WebViewScreen> {
     );
   }
 
-  IconData _getIconForString(String iconName) {
-    switch (iconName.toLowerCase()) {
-      case 'home': return Icons.home;
-      case 'search': return Icons.search;
-      case 'settings': return Icons.settings;
-      case 'account_circle': return Icons.account_circle;
-      case 'shopping_cart': return Icons.shopping_cart;
-      case 'favorite': return Icons.favorite;
-      case 'star': return Icons.star;
-      case 'notifications': return Icons.notifications;
-      case 'info': return Icons.info;
-      case 'menu': return Icons.menu;
-      case 'mail': return Icons.mail;
-      case 'phone': return Icons.phone;
-      case 'location_on': return Icons.location_on;
-      case 'chat': return Icons.chat;
-      case 'camera_alt': return Icons.camera_alt;
-      case 'image': return Icons.image;
-      case 'article': return Icons.article;
-      case 'share': return Icons.share;
-      case 'language': return Icons.language;
-      case 'dashboard': return Icons.dashboard;
-      case 'edit': return Icons.edit;
-      case 'delete': return Icons.delete;
-      case 'add': return Icons.add;
-      case 'check': return Icons.check;
-      case 'close': return Icons.close;
-      case 'arrow_back': return Icons.arrow_back;
-      case 'arrow_forward': return Icons.arrow_forward;
-      case 'local_shipping': return Icons.local_shipping;
-      case 'payment': return Icons.payment;
-      case 'event': return Icons.event;
-      case 'history': return Icons.history;
-      case 'description': return Icons.description;
-      case 'list': return Icons.list;
-      case 'category': return Icons.category;
-      case 'store': return Icons.store;
-      case 'business': return Icons.business;
-      case 'flight': return Icons.flight;
-      case 'hotel': return Icons.hotel;
-      case 'restaurant': return Icons.restaurant;
-      case 'directions_car': return Icons.directions_car;
-      case 'local_hospital': return Icons.local_hospital;
-      case 'school': return Icons.school;
-      case 'work': return Icons.work;
-      case 'group': return Icons.group;
-      case 'person': return Icons.person;
-      case 'thumb_up': return Icons.thumb_up;
-      case 'thumb_down': return Icons.thumb_down;
-      case 'visibility': return Icons.visibility;
-      case 'lock': return Icons.lock;
-      case 'key': return Icons.key;
-      case 'wifi': return Icons.wifi;
-      case 'battery_full': return Icons.battery_full;
-      case 'build': return Icons.build;
-      case 'bug_report': return Icons.bug_report;
-      case 'code': return Icons.code;
-      case 'help': return Icons.help;
-      case 'warning': return Icons.warning;
-      case 'error': return Icons.error;
-      case 'lightbulb': return Icons.lightbulb;
-      case 'attach_file': return Icons.attach_file;
-      case 'mic': return Icons.mic;
-      case 'videocam': return Icons.videocam;
-      case 'play_arrow': return Icons.play_arrow;
-      case 'pause': return Icons.pause;
-      case 'stop': return Icons.stop;
-      case 'volume_up': return Icons.volume_up;
-      case 'music_note': return Icons.music_note;
-      case 'movie': return Icons.movie;
-      case 'tv': return Icons.tv;
-      case 'sports_esports': return Icons.sports_esports;
-      case 'casino': return Icons.casino;
-      case 'fitness_center': return Icons.fitness_center;
-      case 'spa': return Icons.spa;
-      case 'pets': return Icons.pets;
-      case 'explore': return Icons.explore;
-      case 'map': return Icons.map;
-      case 'place': return Icons.place;
-      case 'local_offer': return Icons.local_offer;
-      case 'sell': return Icons.sell;
-      case 'shopping_bag': return Icons.shopping_bag;
-      case 'receipt': return Icons.receipt;
-      case 'account_balance': return Icons.account_balance;
-      case 'credit_card': return Icons.credit_card;
-      case 'monetization_on': return Icons.monetization_on;
-      case 'trending_up': return Icons.trending_up;
-      case 'analytics': return Icons.analytics;
-      case 'bar_chart': return Icons.bar_chart;
-      case 'pie_chart': return Icons.pie_chart;
-      case 'science': return Icons.science;
-      case 'emoji_emotions': return Icons.emoji_emotions;
-      case 'sentiment_satisfied': return Icons.sentiment_satisfied;
-      case 'water_drop': return Icons.water_drop;
-      case 'eco': return Icons.eco;
-      case 'wb_sunny': return Icons.wb_sunny;
-      case 'nightlight_round': return Icons.nightlight_round;
-      case 'cloud': return Icons.cloud;
-      case 'ac_unit': return Icons.ac_unit;
-      case 'fire_extinguisher': return Icons.fire_extinguisher;
-      case 'local_fire_department': return Icons.local_fire_department;
-      case 'security': return Icons.security;
-      case 'shield': return Icons.shield;
-      case 'policy': return Icons.policy;
-      case 'gavel': return Icons.gavel;
-      case 'apartment': return Icons.apartment;
-      case 'house': return Icons.house;
-      case 'domain': return Icons.domain;
-      case 'public': return Icons.public;
-      case 'rocket_launch': return Icons.rocket_launch;
-      case 'airport_shuttle': return Icons.airport_shuttle;
-      default: return Icons.circle;
+  IconData _getIconForString(String rawIconName) {
+    // Normalize Dashicon slug names from WordPress
+    String name = rawIconName.toLowerCase().trim()
+        .replaceAll('dashicons-', '')
+        .replaceAll('dashicon-', '')
+        .replaceAll('_', '-')
+        .replaceAll(' ', '-');
+
+    switch (name) {
+      // Home & Main
+      case 'admin-home':
+      case 'home':
+      case 'house':
+        return Icons.home_rounded;
+      
+      // Search
+      case 'search':
+        return Icons.search_rounded;
+      
+      // Settings & Tools
+      case 'admin-settings':
+      case 'settings':
+      case 'admin-generic':
+      case 'admin-tools':
+      case 'build':
+        return Icons.settings_rounded;
+      
+      // Users & Accounts
+      case 'admin-users':
+      case 'businessman':
+      case 'person':
+      case 'account-circle':
+      case 'groups':
+      case 'group':
+        return Icons.person_rounded;
+      
+      // Cart, Shop & Commerce
+      case 'cart':
+      case 'shopping-cart':
+      case 'shopping-bag':
+      case 'store':
+      case 'storefront':
+        return Icons.shopping_cart_rounded;
+      case 'sell':
+      case 'local-offer':
+      case 'tickets':
+      case 'tickets-alt':
+        return Icons.local_offer_rounded;
+      case 'payment':
+      case 'credit-card':
+      case 'account-balance':
+      case 'monetization-on':
+        return Icons.credit_card_rounded;
+      
+      // Favorites & Ratings
+      case 'heart':
+      case 'favorite':
+        return Icons.favorite_rounded;
+      case 'star':
+      case 'star-filled':
+      case 'star-empty':
+      case 'awards':
+        return Icons.star_rounded;
+      case 'thumbs-up':
+      case 'thumb-up':
+        return Icons.thumb_up_rounded;
+      case 'thumbs-down':
+      case 'thumb-down':
+        return Icons.thumb_down_rounded;
+      
+      // Notifications & Chat
+      case 'bell':
+      case 'notifications':
+        return Icons.notifications_rounded;
+      case 'email':
+      case 'mail':
+      case 'format-email':
+        return Icons.email_rounded;
+      case 'chat':
+      case 'format-chat':
+      case 'format-status':
+        return Icons.chat_bubble_rounded;
+      case 'smartphone':
+      case 'phone':
+        return Icons.phone_android_rounded;
+      
+      // Media & Documents
+      case 'camera':
+      case 'camera-alt':
+        return Icons.camera_alt_rounded;
+      case 'image':
+      case 'format-image':
+        return Icons.image_rounded;
+      case 'movie':
+      case 'format-video':
+      case 'video-alt3':
+      case 'videocam':
+        return Icons.videocam_rounded;
+      case 'music-note':
+      case 'playlist-audio':
+      case 'controls-volumeon':
+        return Icons.music_note_rounded;
+      case 'article':
+      case 'media-document':
+      case 'media-text':
+      case 'description':
+      case 'clipboard':
+        return Icons.description_rounded;
+      
+      // Navigation & Layout
+      case 'menu':
+      case 'menu-alt':
+      case 'menu-alt2':
+      case 'menu-alt3':
+        return Icons.menu_rounded;
+      case 'grid-view':
+      case 'list-view':
+      case 'category':
+      case 'list':
+        return Icons.grid_view_rounded;
+      case 'location':
+      case 'location-alt':
+      case 'place':
+      case 'map':
+        return Icons.location_on_rounded;
+      case 'dashboard':
+      case 'admin-site':
+      case 'admin-site-alt3':
+        return Icons.dashboard_rounded;
+      
+      // Arrows & Navigation
+      case 'arrow-left-alt2':
+      case 'arrow-left':
+      case 'arrow-back':
+        return Icons.arrow_back_rounded;
+      case 'arrow-right-alt2':
+      case 'arrow-right':
+      case 'arrow-forward':
+        return Icons.arrow_forward_rounded;
+      case 'arrow-up-alt2':
+      case 'arrow-up':
+        return Icons.arrow_upward_rounded;
+      case 'arrow-down-alt2':
+      case 'arrow-down':
+        return Icons.arrow_downward_rounded;
+      
+      // Travel & Buildings
+      case 'car':
+      case 'directions-car':
+      case 'airport-shuttle':
+        return Icons.directions_car_rounded;
+      case 'airplane':
+      case 'flight':
+        return Icons.flight_rounded;
+      case 'building':
+      case 'apartment':
+        return Icons.apartment_rounded;
+      case 'food':
+      case 'restaurant':
+        return Icons.restaurant_rounded;
+      case 'local-hospital':
+        return Icons.local_hospital_rounded;
+      case 'school':
+        return Icons.school_rounded;
+      
+      // Info, Warnings & Status
+      case 'info':
+      case 'info-outline':
+        return Icons.info_rounded;
+      case 'warning':
+      case 'sos':
+      case 'error':
+        return Icons.warning_amber_rounded;
+      case 'yes':
+      case 'check':
+        return Icons.check_circle_rounded;
+      case 'no':
+      case 'close':
+        return Icons.cancel_rounded;
+      case 'plus':
+      case 'plus-alt':
+      case 'add':
+        return Icons.add_rounded;
+      case 'edit':
+        return Icons.edit_rounded;
+      case 'trash':
+      case 'delete':
+        return Icons.delete_rounded;
+      case 'share':
+      case 'share-alt':
+        return Icons.share_rounded;
+      case 'lock':
+        return Icons.lock_rounded;
+      case 'unlock':
+        return Icons.lock_open_rounded;
+      case 'shield':
+      case 'security':
+        return Icons.shield_rounded;
+      case 'wifi':
+        return Icons.wifi_rounded;
+      case 'lightbulb':
+        return Icons.lightbulb_rounded;
+      case 'paperclip':
+      case 'attach-file':
+        return Icons.attach_file_rounded;
+      case 'microphone':
+      case 'mic':
+        return Icons.mic_rounded;
+      case 'calendar-alt':
+      case 'calendar':
+      case 'event':
+        return Icons.calendar_today_rounded;
+      case 'analytics':
+      case 'bar-chart':
+      case 'trending-up':
+        return Icons.analytics_rounded;
+      case 'sports-esports':
+      case 'games':
+        return Icons.sports_esports_rounded;
+      case 'rss':
+        return Icons.rss_feed_rounded;
+      case 'cloud':
+        return Icons.cloud_rounded;
+      case 'rocket-launch':
+      case 'controls-play':
+        return Icons.play_arrow_rounded;
+      
+      default:
+        return Icons.circle;
     }
   }
 }
