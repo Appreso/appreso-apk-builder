@@ -38,6 +38,27 @@ class AppConfig {
   final String bottomNavActiveColor;
   final String bottomNavInactiveColor;
   final String bottomNavStyle;
+  final double bottomNavMarginLeft;
+  final double bottomNavMarginRight;
+  final double bottomNavMarginBottom;
+  final String bottomNavPosition; // 'bottom' or 'top'
+  final double bottomNavBorderRadius;
+  final String bottomNavHideOnScroll; // 'yes' or 'no'
+  final String bottomNavShowLabels; // 'yes' or 'no'
+  final double bottomNavIconSize;
+  final String bottomNavShadow; // 'yes' or 'no'
+  final double bottomNavElevation;
+  final String preloaderPosition; // 'center', 'top', 'bottom'
+  final String preloaderSize; // 'small', 'medium', 'large'
+  final String submenuStyle; // 'grid' or 'list'
+  final int submenuColumns; // 2, 3, or 4
+  final String submenuHeight; // 'auto', 'half', 'large'
+  final String submenuBgColor;
+  final String submenuTextColor;
+  final String submenuActiveColor;
+  final double submenuBorderRadius;
+  final String submenuShowIcons; // 'yes' or 'no'
+  final String submenuShowHeader; // 'yes' or 'no'
 
   const AppConfig({
     required this.siteUrl,
@@ -67,6 +88,27 @@ class AppConfig {
     required this.bottomNavActiveColor,
     required this.bottomNavInactiveColor,
     required this.bottomNavStyle,
+    required this.bottomNavMarginLeft,
+    required this.bottomNavMarginRight,
+    required this.bottomNavMarginBottom,
+    required this.bottomNavPosition,
+    required this.bottomNavBorderRadius,
+    required this.bottomNavHideOnScroll,
+    required this.bottomNavShowLabels,
+    required this.bottomNavIconSize,
+    required this.bottomNavShadow,
+    required this.bottomNavElevation,
+    required this.preloaderPosition,
+    required this.preloaderSize,
+    required this.submenuStyle,
+    required this.submenuColumns,
+    required this.submenuHeight,
+    required this.submenuBgColor,
+    required this.submenuTextColor,
+    required this.submenuActiveColor,
+    required this.submenuBorderRadius,
+    required this.submenuShowIcons,
+    required this.submenuShowHeader,
   });
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -112,6 +154,27 @@ class AppConfig {
       bottomNavActiveColor: json['bottom_nav_active_color']?.toString() ?? '#6366f1',
       bottomNavInactiveColor: json['bottom_nav_inactive_color']?.toString() ?? '#94a3b8',
       bottomNavStyle: json['bottom_nav_style']?.toString() ?? 'full',
+      bottomNavMarginLeft: double.tryParse(json['bottom_nav_margin_left']?.toString() ?? '') ?? 16.0,
+      bottomNavMarginRight: double.tryParse(json['bottom_nav_margin_right']?.toString() ?? '') ?? 16.0,
+      bottomNavMarginBottom: double.tryParse(json['bottom_nav_margin_bottom']?.toString() ?? '') ?? 16.0,
+      bottomNavPosition: json['bottom_nav_position']?.toString() ?? 'bottom',
+      bottomNavBorderRadius: double.tryParse(json['bottom_nav_border_radius']?.toString() ?? '') ?? 30.0,
+      bottomNavHideOnScroll: json['bottom_nav_hide_on_scroll']?.toString() ?? 'no',
+      bottomNavShowLabels: json['bottom_nav_show_labels']?.toString() ?? 'yes',
+      bottomNavIconSize: double.tryParse(json['bottom_nav_icon_size']?.toString() ?? '') ?? 24.0,
+      bottomNavShadow: json['bottom_nav_shadow']?.toString() ?? 'yes',
+      bottomNavElevation: double.tryParse(json['bottom_nav_elevation']?.toString() ?? '') ?? 8.0,
+      preloaderPosition: json['preloader_position']?.toString() ?? 'center',
+      preloaderSize: json['preloader_size']?.toString() ?? 'medium',
+      submenuStyle: json['submenu_style']?.toString() ?? 'grid',
+      submenuColumns: int.tryParse(json['submenu_columns']?.toString() ?? '') ?? 3,
+      submenuHeight: json['submenu_height']?.toString() ?? 'auto',
+      submenuBgColor: json['submenu_bg_color']?.toString() ?? '#ffffff',
+      submenuTextColor: json['submenu_text_color']?.toString() ?? '#1e293b',
+      submenuActiveColor: json['submenu_active_color']?.toString() ?? '#6366f1',
+      submenuBorderRadius: double.tryParse(json['submenu_border_radius']?.toString() ?? '') ?? 24.0,
+      submenuShowIcons: json['submenu_show_icons']?.toString() ?? 'yes',
+      submenuShowHeader: json['submenu_show_header']?.toString() ?? 'yes',
     );
   }
 
@@ -155,6 +218,27 @@ class AppConfig {
       bottomNavActiveColor: '#6366f1',
       bottomNavInactiveColor: '#94a3b8',
       bottomNavStyle: 'full',
+      bottomNavMarginLeft: 16.0,
+      bottomNavMarginRight: 16.0,
+      bottomNavMarginBottom: 16.0,
+      bottomNavPosition: 'bottom',
+      bottomNavBorderRadius: 30.0,
+      bottomNavHideOnScroll: 'no',
+      bottomNavShowLabels: 'yes',
+      bottomNavIconSize: 24.0,
+      bottomNavShadow: 'yes',
+      bottomNavElevation: 8.0,
+      preloaderPosition: 'center',
+      preloaderSize: 'medium',
+      submenuStyle: 'grid',
+      submenuColumns: 3,
+      submenuHeight: 'auto',
+      submenuBgColor: '#ffffff',
+      submenuTextColor: '#1e293b',
+      submenuActiveColor: '#6366f1',
+      submenuBorderRadius: 24.0,
+      submenuShowIcons: 'yes',
+      submenuShowHeader: 'yes',
     );
   }
 
