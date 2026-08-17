@@ -349,7 +349,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   ),
                 ),
 
-              // Error Retry Overlay — shown when page fails to load
+              // Error Retry Overlay
               if (_isVerificationFailed)
                 Positioned.fill(
                   child: Container(
@@ -440,11 +440,17 @@ class _WebViewScreenState extends State<WebViewScreen> {
     final borderRadius = isFloating ? widget.config.bottomNavBorderRadius : 0.0;
     final hasShadow = widget.config.bottomNavShadow == 'yes';
     final elevation = widget.config.bottomNavElevation;
+    final paddingY = widget.config.bottomNavPaddingY;
+    final paddingX = widget.config.bottomNavPaddingX;
+    final borderWidth = widget.config.bottomNavBorderWidth;
+    final borderColor = AppConfig.hexToColor(widget.config.bottomNavBorderColor);
+    final indicatorStyle = widget.config.bottomNavIndicatorStyle;
 
     Widget navItems = Container(
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: borderWidth > 0 ? Border.all(color: borderColor, width: borderWidth) : null,
         boxShadow: hasShadow
             ? [
                 BoxShadow(
@@ -460,7 +466,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         child: Material(
           color: Colors.transparent,
           child: Padding(
-            padding: EdgeInsets.symmetric(vertical: showLabels ? 6 : 10),
+            padding: EdgeInsets.symmetric(vertical: paddingY, horizontal: paddingX),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(tabs.length, (index) {
@@ -472,6 +478,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
                 return Expanded(
                   child: InkWell(
+                    borderRadius: BorderRadius.circular(borderRadius > 0 ? borderRadius / 2 : 12),
                     onTap: () {
                       final subMenuRaw = tab['sub_menu'];
                       List<dynamic> subMenu = [];
@@ -492,29 +499,53 @@ class _WebViewScreenState extends State<WebViewScreen> {
                         }
                       }
                     },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _getIconForString(iconName),
-                          size: iconSize,
-                          color: itemColor,
-                        ),
-                        if (showLabels && label.isNotEmpty) ...[
-                          const SizedBox(height: 3),
-                          Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: itemColor,
-                            ),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: (indicatorStyle == 'pill' && isSelected) ? 8 : 2,
+                      ),
+                      decoration: (indicatorStyle == 'pill' && isSelected)
+                          ? BoxDecoration(
+                              color: activeColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(16),
+                            )
+                          : null,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _getIconForString(iconName),
+                            size: iconSize,
+                            color: itemColor,
                           ),
+                          if (indicatorStyle == 'dot' && isSelected) ...[
+                            const SizedBox(height: 3),
+                            Container(
+                              width: 4,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: activeColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                          if (showLabels && label.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: itemColor,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -750,7 +781,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   IconData _getIconForString(String rawIconName) {
-    // Normalize Dashicon slug names from WordPress
     String name = rawIconName.toLowerCase().trim()
         .replaceAll('dashicons-', '')
         .replaceAll('dashicon-', '')
