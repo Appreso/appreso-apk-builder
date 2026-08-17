@@ -187,19 +187,15 @@ jobs:
 
       - name: Create Release & Upload APK
         id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "build-${{ github.run_number }}"
-          name: "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}"
-          body: |
-            **App Name:** ${{ env.APP_NAME }}
-            **Site URL:** ${{ env.SITE_URL }}
-            **Built at:** ${{ github.event.repository.updated_at }}
-          files: build/app/outputs/flutter-apk/app-release.apk
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "build-${{ github.run_number }}" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --title "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}" \
+            --notes "**App Name:** ${{ env.APP_NAME }}
+          **Site URL:** ${{ env.SITE_URL }}
+          **Built at:** ${{ github.event.repository.updated_at }}"
 
       - name: Send callback to WordPress
         run: |
