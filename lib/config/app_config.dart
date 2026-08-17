@@ -48,6 +48,11 @@ class AppConfig {
   final double bottomNavIconSize;
   final String bottomNavShadow; // 'yes' or 'no'
   final double bottomNavElevation;
+  final double bottomNavPaddingY;
+  final double bottomNavPaddingX;
+  final double bottomNavBorderWidth;
+  final String bottomNavBorderColor;
+  final String bottomNavIndicatorStyle; // 'color', 'pill', 'dot'
   final String preloaderPosition; // 'center', 'top', 'bottom'
   final String preloaderSize; // 'small', 'medium', 'large'
   final String submenuStyle; // 'grid' or 'list'
@@ -98,6 +103,11 @@ class AppConfig {
     required this.bottomNavIconSize,
     required this.bottomNavShadow,
     required this.bottomNavElevation,
+    required this.bottomNavPaddingY,
+    required this.bottomNavPaddingX,
+    required this.bottomNavBorderWidth,
+    required this.bottomNavBorderColor,
+    required this.bottomNavIndicatorStyle,
     required this.preloaderPosition,
     required this.preloaderSize,
     required this.submenuStyle,
@@ -164,6 +174,11 @@ class AppConfig {
       bottomNavIconSize: double.tryParse(json['bottom_nav_icon_size']?.toString() ?? '') ?? 24.0,
       bottomNavShadow: json['bottom_nav_shadow']?.toString() ?? 'yes',
       bottomNavElevation: double.tryParse(json['bottom_nav_elevation']?.toString() ?? '') ?? 8.0,
+      bottomNavPaddingY: double.tryParse(json['bottom_nav_padding_y']?.toString() ?? '') ?? 8.0,
+      bottomNavPaddingX: double.tryParse(json['bottom_nav_padding_x']?.toString() ?? '') ?? 8.0,
+      bottomNavBorderWidth: double.tryParse(json['bottom_nav_border_width']?.toString() ?? '') ?? 0.0,
+      bottomNavBorderColor: json['bottom_nav_border_color']?.toString() ?? '#e2e8f0',
+      bottomNavIndicatorStyle: json['bottom_nav_indicator_style']?.toString() ?? 'color',
       preloaderPosition: json['preloader_position']?.toString() ?? 'center',
       preloaderSize: json['preloader_size']?.toString() ?? 'medium',
       submenuStyle: json['submenu_style']?.toString() ?? 'grid',
@@ -228,6 +243,11 @@ class AppConfig {
       bottomNavIconSize: 24.0,
       bottomNavShadow: 'yes',
       bottomNavElevation: 8.0,
+      bottomNavPaddingY: 8.0,
+      bottomNavPaddingX: 8.0,
+      bottomNavBorderWidth: 0.0,
+      bottomNavBorderColor: '#e2e8f0',
+      bottomNavIndicatorStyle: 'color',
       preloaderPosition: 'center',
       preloaderSize: 'medium',
       submenuStyle: 'grid',
