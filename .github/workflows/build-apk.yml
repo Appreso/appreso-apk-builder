@@ -185,17 +185,34 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
           cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
 
+      - name: Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
       - name: Create Release & Upload APK
         id: create_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "build-${{ github.run_number }}" \
-            build/app/outputs/flutter-apk/app-release.apk \
-            --title "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}" \
-            --notes "**App Name:** ${{ env.APP_NAME }}
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i to publish release..."
+            if gh release create "build-${{ github.run_number }}" \
+              build/app/outputs/flutter-apk/app-release.apk \
+              --title "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}" \
+              --notes "**App Name:** ${{ env.APP_NAME }}
           **Site URL:** ${{ env.SITE_URL }}
-          **Built at:** ${{ github.event.repository.updated_at }}"
+          **Built at:** ${{ github.event.repository.updated_at }}" ; then
+              echo "Release published successfully!"
+              exit 0
+            fi
+            echo "Release creation encountered temporary server issue. Retrying in 8 seconds..."
+            sleep 8
+          done
+          echo "Failed to create release after 5 attempts."
+          exit 1
 
       - name: Send callback to WordPress
         run: |
