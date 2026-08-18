@@ -1,101 +1,98 @@
-name: Build APK
+name: Build Android APK
+run-name: "Build #${{ github.run_number }} (${{ github.event.client_payload.app_name || 'AppReso App' }})"
 
 on:
   repository_dispatch:
-    types: [build_apk]
+    types: [build-apk]
   workflow_dispatch:
     inputs:
-      site_url:
-        description: 'Site URL'
-        required: true
-        default: 'https://example.com'
       app_name:
         description: 'App Name'
-        required: true
+        required: false
         default: 'AppReso App'
 
-permissions:
-  contents: write
-
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter SDK
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.22.3'
           cache: true
 
-      - name: Create Pristine Flutter Project
+      - name: Parse Dispatch Payload
+        id: payload
         run: |
-          flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/appreso_build
+          PAYLOAD='${{ toJson(github.event.client_payload) }}'
+          echo "Payload received: $PAYLOAD"
           
-          # Copy custom code into the fresh project
-          cp -r lib /tmp/appreso_build/
-          cp -r assets /tmp/appreso_build/ 2>/dev/null || true
-          cp pubspec.yaml /tmp/appreso_build/
-
-      - name: Process Configuration Payload
-        id: config
-        env:
-          PAYLOAD_JSON: ${{ github.event.client_payload.config_json }}
-          INPUT_SITE: ${{ github.event.inputs.site_url }}
-          INPUT_NAME: ${{ github.event.inputs.app_name }}
-        run: |
+          # Create temporary build dir
+          rm -rf /tmp/appreso_build
+          cp -r . /tmp/appreso_build
           cd /tmp/appreso_build
           
-          if [ -z "$PAYLOAD_JSON" ]; then
-            printf '{"site_url":"%s","app_name":"%s"}' "$INPUT_SITE" "$INPUT_NAME" > payload.json
-          else
-            printf '%s' "$PAYLOAD_JSON" > payload.json
-          fi
+          # Write payload to file for python/jq processing
+          echo '$PAYLOAD' > payload.json
           
+          # Extract values
+          echo "SITE_URL=$(jq -r '.site_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "APP_NAME=$(jq -r '.app_name // "AppReso App"' payload.json)" >> $GITHUB_ENV
+          echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
+          echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
+          echo "BUILD_ID=$(jq -r '.build_id // empty' payload.json)" >> $GITHUB_ENV
+          
+          # App Config JSON for Flutter assets
           mkdir -p assets
           jq '{site_url, app_name, api_namespace: "appreso/v1", splash_type, splash_bg_color, splash_show_name, splash_custom_text, splash_text_color, preloader_enabled, preloader_style, preloader_color, preloader_bg_color, preloader_position, preloader_size, pull_refresh, pull_refresh_color, status_bar_color, show_branding, offline_mode, app_version, update_message, onesignal_app_id, deep_link_url, bottom_nav_enabled, bottom_nav_tabs, bottom_nav_bg_color, bottom_nav_active_color, bottom_nav_inactive_color, bottom_nav_style, bottom_nav_margin_left, bottom_nav_margin_right, bottom_nav_margin_bottom, bottom_nav_position, bottom_nav_border_radius, bottom_nav_hide_on_scroll, bottom_nav_show_labels, bottom_nav_icon_size, bottom_nav_shadow, bottom_nav_elevation, bottom_nav_padding_y, bottom_nav_padding_x, bottom_nav_border_width, bottom_nav_border_color, bottom_nav_indicator_style, submenu_style, submenu_columns, submenu_height, submenu_bg_color, submenu_text_color, submenu_active_color, submenu_border_radius, submenu_show_icons, submenu_show_header} | with_entries(select(.value != null))' payload.json > assets/config.json
           
-          echo "APP_NAME=$(jq -r '.app_name // "AppReso App"' payload.json)" >> $GITHUB_ENV
-          echo "SITE_URL=$(jq -r '.site_url // "https://example.com"' payload.json)" >> $GITHUB_ENV
+          echo "Assets config.json:"
+          cat assets/config.json
+          
           echo "APP_ICON_URL=$(jq -r '.app_icon_url // empty' payload.json)" >> $GITHUB_ENV
           echo "SPLASH_SCREEN_URL=$(jq -r '.splash_screen_url // empty' payload.json)" >> $GITHUB_ENV
-          echo "DEEP_LINK_URL=$(jq -r '.deep_link_url // empty' payload.json)" >> $GITHUB_ENV
-          echo "CALLBACK_URL=$(jq -r '.callback_url // empty' payload.json)" >> $GITHUB_ENV
-          echo "CALLBACK_SECRET=$(jq -r '.callback_secret // empty' payload.json)" >> $GITHUB_ENV
+          echo "DEEP_LINK_SCHEME=$(jq -r '.deep_link_url // "appreso"' payload.json)" >> $GITHUB_ENV
 
-      - name: Patch Android Build Configuration
+      - name: Patch Gradle and SDK Configuration
         run: |
           cd /tmp/appreso_build
           
           echo "=== BEFORE PATCHING ==="
           echo "--- settings.gradle ---"
-          cat android/settings.gradle
+          cat android/settings.gradle || true
           echo ""
           echo "--- app/build.gradle (minSdkVersion lines) ---"
-          grep -n "minSdkVersion" android/app/build.gradle || true
+          grep -n "minSdk" android/app/build.gradle || true
           echo "========================"
+          echo ""
           
-          # 1. Update minSdkVersion to 21 (required by flutter_inappwebview)
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle 2>/dev/null || true
+          # 1. Update Gradle Wrapper from 7.6.3 to 8.4
+          sed -i 's/gradle-7.6.3-all.zip/gradle-8.4-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/gradle-7.5-all.zip/gradle-8.4-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/gradle-8.0-all.zip/gradle-8.4-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
           
-          # 2. Update Gradle Wrapper to 8.3
-          sed -i 's/gradle-[0-9.]*-/gradle-8.3-/g' android/gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
+          # 2. Update Android Gradle Plugin (AGP) to 8.3.2 in settings.gradle
+          sed -i 's/id "com.android.application" version "7.3.0" apply false/id "com.android.application" version "8.3.2" apply false/g' android/settings.gradle
+          sed -i 's/id "com.android.application" version "8.1.0" apply false/id "com.android.application" version "8.3.2" apply false/g' android/settings.gradle
+          sed -i 's/id "com.android.application" version "8.2.1" apply false/id "com.android.application" version "8.3.2" apply false/g' android/settings.gradle
           
-          # 3. Update AGP version to 7.4.2 (Kotlin 2.2.0 requires AGP >= 7.3.1, default 7.3.0)
-          sed -i 's/id "com.android.application" version "7.3.0" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
-          sed -i 's/id "com.android.application" version "[^"]*" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
+          # 3. Patch minSdkVersion to 21 (required by flutter_inappwebview)
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle
+          sed -i 's/minSdkVersion 16/minSdkVersion 21/g' android/app/build.gradle
+          sed -i 's/minSdkVersion 19/minSdkVersion 21/g' android/app/build.gradle
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle
+          sed -i 's/minSdk = 16/minSdk = 21/g' android/app/build.gradle
+          sed -i 's/minSdk = 19/minSdk = 21/g' android/app/build.gradle
           
           # 4. Update Kotlin version to 2.2.0
           sed -i 's/id "org.jetbrains.kotlin.android" version "1.7.10" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
@@ -122,9 +119,7 @@ jobs:
           
           if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
             echo "Downloading app icon from: $APP_ICON_URL"
-            curl -L -o assets/app_icon.png "$APP_ICON_URL"
-            
-            sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
+            curl -sSL -o assets/app_icon.png "$APP_ICON_URL"
             
             ICON_DIRS=(
               "android/app/src/main/res/mipmap-mdpi:48"
@@ -138,8 +133,15 @@ jobs:
               DIR="${entry%%:*}"
               SIZE="${entry##*:}"
               mkdir -p "$DIR"
-              convert assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png"
+              if command -v convert >/dev/null 2>&1; then
+                convert assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png" || cp assets/app_icon.png "$DIR/ic_launcher.png"
+              elif command -v magick >/dev/null 2>&1; then
+                magick assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png" || cp assets/app_icon.png "$DIR/ic_launcher.png"
+              else
+                cp assets/app_icon.png "$DIR/ic_launcher.png"
+              fi
             done
+            echo "App icons generated successfully."
           fi
 
       - name: Download Splash Screen
@@ -158,85 +160,99 @@ jobs:
           
           # Internet Permission & Cleartext Traffic (allows HTTP sites on Android 9+)
           if ! grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml; then
-            sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
           fi
+          sed -i 's|<application|<application android:usesCleartextTraffic="true"|g' android/app/src/main/AndroidManifest.xml
           
-          if ! grep -q 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml; then
-            sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-          fi
-          
-          # Deep Linking
-          if [ -n "$DEEP_LINK_URL" ] && [ "$DEEP_LINK_URL" != "" ]; then
-            SCHEME=$(echo "$DEEP_LINK_URL" | sed -E 's|^(.*)://.*|\1|')
-            HOST=$(echo "$DEEP_LINK_URL" | sed -E 's|^.*://([^/]*).*|\1|')
-            
-            INTENT_FILTER="<intent-filter android:autoVerify=\"true\">\n<action android:name=\"android.intent.action.VIEW\" />\n<category android:name=\"android.intent.category.DEFAULT\" />\n<category android:name=\"android.intent.category.BROWSABLE\" />\n<data android:scheme=\"$SCHEME\" android:host=\"$HOST\" />\n</intent-filter>"
-            
-            sed -i "/<\/activity>/i $INTENT_FILTER" android/app/src/main/AndroidManifest.xml
+          # Deep Linking Intent Filter
+          SCHEME="${DEEP_LINK_SCHEME:-appreso}"
+          if [ -n "$SCHEME" ] && [ "$SCHEME" != "" ]; then
+            INTENT_FILTER='<intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="'${SCHEME}'"/></intent-filter>'
+            sed -i "s|</activity>|${INTENT_FILTER}</activity>|g" android/app/src/main/AndroidManifest.xml
           fi
 
-      - name: Build Release APK
+      - name: Install Flutter Dependencies
         run: |
           cd /tmp/appreso_build
-          flutter clean
           flutter pub get
-          flutter build apk --release --no-tree-shake-icons
-          
-          mkdir -p $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
-          cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
 
-      - name: Upload APK as Workflow Artifact
+      - name: Build APK (Release Mode)
+        run: |
+          cd /tmp/appreso_build
+          flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload Artifact as Fallback
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 14
+          name: app-release
+          path: /tmp/appreso_build/build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Create Release & Upload APK
+      - name: Create Release & Upload APK with Retry
         id: create_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for i in 1 2 3 4 5; do
-            echo "Attempt $i to publish release..."
-            if gh release create "build-${{ github.run_number }}" \
-              build/app/outputs/flutter-apk/app-release.apk \
-              --title "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}" \
-              --notes "**App Name:** ${{ env.APP_NAME }}
-          **Site URL:** ${{ env.SITE_URL }}
-          **Built at:** ${{ github.event.repository.updated_at }}" ; then
-              echo "Release published successfully!"
-              exit 0
-            fi
-            echo "Release creation encountered temporary server issue. Retrying in 8 seconds..."
-            sleep 8
-          done
-          echo "Failed to create release after 5 attempts."
-          exit 1
-
-      - name: Send callback to WordPress
-        run: |
-          APK_URL="https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk"
+          TAG_NAME="build-${{ github.run_number }}"
+          APK_PATH="/tmp/appreso_build/build/app/outputs/flutter-apk/app-release.apk"
           
-          if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
-            curl -s -o /dev/null -w "%{http_code}" \
-              -X POST "$CALLBACK_URL" \
+          echo "Creating GitHub Release with tag $TAG_NAME..."
+          
+          # Retry up to 5 times in case GitHub Release API has momentary 502/503 hiccups
+          MAX_RETRIES=5
+          COUNT=0
+          SUCCESS=0
+          
+          while [ $COUNT -lt $MAX_RETRIES ]; do
+            COUNT=$((COUNT+1))
+            echo "Attempt $COUNT to create release..."
+            
+            if gh release create "$TAG_NAME" "$APK_PATH" \
+                --repo "${{ github.repository }}" \
+                --title "${{ env.APP_NAME }} - Build #${{ github.run_number }}" \
+                --notes "Automated release by AppReso Plugin for ${{ env.APP_NAME }}."; then
+              echo "Release created successfully on attempt $COUNT!"
+              SUCCESS=1
+              break
+            else
+              echo "Release attempt $COUNT failed. Waiting 10s before retry..."
+              sleep 10
+            fi
+          done
+          
+          if [ $SUCCESS -eq 0 ]; then
+            echo "Failed to create GitHub release after $MAX_RETRIES attempts."
+            exit 1
+          fi
+          
+          RELEASE_APK_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/app-release.apk"
+          echo "RELEASE_APK_URL=$RELEASE_APK_URL" >> $GITHUB_ENV
+
+      - name: Send Success Callback to WordPress
+        if: success()
+        run: |
+          if [ -n "$CALLBACK_URL" ]; then
+            echo "Sending success callback to WordPress: $CALLBACK_URL"
+            curl -X POST "$CALLBACK_URL" \
               -H "Content-Type: application/json" \
               -H "X-AppReso-Secret: $CALLBACK_SECRET" \
-              -d "{\"apk_url\": \"${APK_URL}\", \"status\": \"success\"}"
+              -d '{
+                "status": "completed",
+                "apk_url": "'"$RELEASE_APK_URL"'",
+                "build_id": "'"$BUILD_ID"'"
+              }'
           fi
 
-      - name: Send failure callback
+      - name: Send Failure Callback to WordPress
         if: failure()
         run: |
-          if [ -f /tmp/appreso_build/payload.json ]; then
-            CALLBACK_URL=$(jq -r '.callback_url // empty' /tmp/appreso_build/payload.json)
-            CALLBACK_SECRET=$(jq -r '.callback_secret // empty' /tmp/appreso_build/payload.json)
-            
-            if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
-              curl -s -X POST "$CALLBACK_URL" \
-                -H "Content-Type: application/json" \
-                -H "X-AppReso-Secret: $CALLBACK_SECRET" \
-                -d '{"status": "failed", "error": "APK build failed. Check GitHub Actions logs."}'
-            fi
+          if [ -n "$CALLBACK_URL" ]; then
+            echo "Sending failure callback to WordPress: $CALLBACK_URL"
+            curl -X POST "$CALLBACK_URL" \
+              -H "Content-Type: application/json" \
+              -H "X-AppReso-Secret: $CALLBACK_SECRET" \
+              -d '{
+                "status": "failed",
+                "error": "Build failed on GitHub Actions runner. Check workflow logs.",
+                "build_id": "'"$BUILD_ID"'"
+              }'
           fi
