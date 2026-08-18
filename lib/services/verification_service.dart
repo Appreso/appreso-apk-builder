@@ -66,23 +66,42 @@ class VerificationService {
         }
       }
 
+      // Server responded but the verify endpoint returned non-200
+      // (e.g. 404 means plugin is deactivated) — mark as NOT active
       debugPrint('Verification endpoint returned status: ${response.statusCode}');
       return VerificationResult(
-        isActive: false, latestVersion: '1.0.0', minVersion: '1.0.0',
-        forceUpdate: false, updateTitle: '', updateMessage: '', apkUrl: '',
+        isActive: false,
+        latestVersion: '1.0.0',
+        minVersion: '1.0.0',
+        forceUpdate: false,
+        updateTitle: '',
+        updateMessage: '',
+        apkUrl: '',
       );
 
     } on TimeoutException {
+      // Timeout — server is slow, allow app to work
       debugPrint('Verification timed out, allowing app to continue');
       return VerificationResult(
-        isActive: true, latestVersion: '1.0.0', minVersion: '1.0.0',
-        forceUpdate: false, updateTitle: '', updateMessage: '', apkUrl: '',
+        isActive: true,
+        latestVersion: '1.0.0',
+        minVersion: '1.0.0',
+        forceUpdate: false,
+        updateTitle: '',
+        updateMessage: '',
+        apkUrl: '',
       );
     } catch (e) {
+      // Network error (no internet, DNS failure, etc.)
       debugPrint('Verification network error: $e');
       return VerificationResult(
-        isActive: true, latestVersion: '1.0.0', minVersion: '1.0.0',
-        forceUpdate: false, updateTitle: '', updateMessage: '', apkUrl: '',
+        isActive: true,
+        latestVersion: '1.0.0',
+        minVersion: '1.0.0',
+        forceUpdate: false,
+        updateTitle: '',
+        updateMessage: '',
+        apkUrl: '',
       );
     }
   }
