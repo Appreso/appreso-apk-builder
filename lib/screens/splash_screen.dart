@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         verification = await verifyFuture;
       } catch (e) {
         debugPrint('Verification failed: $e');
-        verification = VerificationResult(isActive: true, requiredVersion: '1.0.0', updateMessage: '');
+        verification = VerificationResult(isActive: true, latestVersion: '1.0.0', minVersion: '1.0.0', forceUpdate: false, updateTitle: '', updateMessage: '', apkUrl: '');
       }
       
       try {
@@ -88,10 +88,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       return;
     }
 
-    // Force Update Check
+    // In-App Version & Force Update Check
     if (verification != null && packageInfo != null) {
-      if (_isUpdateRequired(packageInfo.version, verification.requiredVersion)) {
-        _showUpdateDialog(verification.updateMessage);
+      final currentVer = packageInfo.version;
+      final latestVer = verification.latestVersion;
+      final minVer = verification.minVersion;
+
+      if (_isOlderVersion(currentVer, latestVer)) {
+        final bool isForce = verification.forceUpdate || _isOlderVersion(currentVer, minVer);
+        _showUpdateDialog(
+          currentVersion: currentVer,
+          latestVersion: latestVer,
+          title: verification.updateTitle,
+          message: verification.updateMessage,
+          apkUrl: verification.apkUrl.isNotEmpty ? verification.apkUrl : widget.config.siteUrl,
+          isForce: isForce,
+        );
         return;
       }
     }
@@ -102,15 +114,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
   }
 
-  bool _isUpdateRequired(String current, String required) {
+  bool _isOlderVersion(String current, String target) {
     try {
-      final cleanCurrent = current.split('+')[0];
-      final currentParts = cleanCurrent.split('.').map(int.parse).toList();
-      final requiredParts = required.split('.').map(int.parse).toList();
-      for (var i = 0; i < requiredParts.length; i++) {
-        if (i >= currentParts.length) return true;
-        if (requiredParts[i] > currentParts[i]) return true;
-        if (requiredParts[i] < currentParts[i]) return false;
+      final cleanCurrent = current.split('+')[0].trim();
+      final cleanTarget = target.split('+')[0].trim();
+      
+      final currentParts = cleanCurrent.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+      final targetParts = cleanTarget.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+
+      for (var i = 0; i < targetParts.length; i++) {
+        final curr = i < currentParts.length ? currentParts[i] : 0;
+        final targ = targetParts[i];
+        if (curr < targ) return true;
+        if (curr > targ) return false;
       }
       return false;
     } catch (e) {
@@ -118,21 +134,166 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  void _showUpdateDialog(String message) {
+  void _showUpdateDialog({
+    required String currentVersion,
+    required String latestVersion,
+    required String title,
+    required String message,
+    required String apkUrl,
+    required bool isForce,
+  }) {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Update Required'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () {
-              launchUrl(Uri.parse(widget.config.siteUrl), mode: LaunchMode.externalApplication);
-            },
-            child: const Text('UPDATE NOW'),
+      barrierDismissible: !isForce,
+      builder: (dialogContext) => PopScope(
+        canPop: !isForce,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 16,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Icon / Header Badge
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.rocket_launch_rounded,
+                      size: 38,
+                      color: Color(0xFF6366F1),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Title
+                Text(
+                  title.isNotEmpty ? title : 'New Version Available!',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Version Badge (v1.0.0 -> v1.2.0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'v$currentVersion',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF6366F1)),
+                      ),
+                      Text(
+                        'v$latestVersion',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Changelog / Message Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      message.isNotEmpty ? message : 'A new version with improvements and bug fixes is ready for you.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // Primary Action Button (Download & Update Now)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.parse(apkUrl);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                    label: const Text(
+                      'Download & Update Now',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+
+                // Optional "Later" button for non-force updates
+                if (!isForce) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => WebViewScreen(config: widget.config)),
+                      );
+                    },
+                    child: Text(
+                      'Remind Me Later',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
