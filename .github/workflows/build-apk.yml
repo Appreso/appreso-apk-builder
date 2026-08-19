@@ -25,13 +25,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -152,7 +152,7 @@ jobs:
           echo "--- settings.gradle ---"
           cat android/settings.gradle
           echo ""
-          echo "--- app/build.gradle (minSdk lines) ---"
+          echo "--- app/build.gradle (minSdkVersion lines) ---"
           grep -n "minSdk" android/app/build.gradle || true
           echo "========================"
 
@@ -162,7 +162,24 @@ jobs:
           
           if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
             echo "Downloading app icon from: $APP_ICON_URL"
-            curl -sSL -o assets/app_icon.png "$APP_ICON_URL"
+            
+            # Download to original file (could be webp, jpg, svg, png etc.)
+            curl -sSL -o assets/app_icon_original "$APP_ICON_URL"
+            
+            # Convert to proper PNG first (handles webp, jpg, svg, etc.)
+            if command -v convert >/dev/null 2>&1; then
+              convert assets/app_icon_original -background none -flatten PNG32:assets/app_icon.png
+              echo "Converted icon to PNG using ImageMagick convert"
+            elif command -v magick >/dev/null 2>&1; then
+              magick assets/app_icon_original -background none -flatten PNG32:assets/app_icon.png
+              echo "Converted icon to PNG using ImageMagick magick"
+            else
+              echo "WARNING: No ImageMagick found, copying raw file as PNG"
+              cp assets/app_icon_original assets/app_icon.png
+            fi
+            
+            # Verify it's a valid PNG
+            file assets/app_icon.png
             
             ICON_DIRS=(
               "android/app/src/main/res/mipmap-mdpi:48"
@@ -177,21 +194,31 @@ jobs:
               SIZE="${entry##*:}"
               mkdir -p "$DIR"
               if command -v convert >/dev/null 2>&1; then
-                convert assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png" || cp assets/app_icon.png "$DIR/ic_launcher.png"
+                convert assets/app_icon.png -resize ${SIZE}x${SIZE} PNG32:"$DIR/ic_launcher.png"
               elif command -v magick >/dev/null 2>&1; then
-                magick assets/app_icon.png -resize ${SIZE}x${SIZE} "$DIR/ic_launcher.png" || cp assets/app_icon.png "$DIR/ic_launcher.png"
+                magick assets/app_icon.png -resize ${SIZE}x${SIZE} PNG32:"$DIR/ic_launcher.png"
               else
                 cp assets/app_icon.png "$DIR/ic_launcher.png"
               fi
             done
-            echo "App icons generated successfully."
+            echo "✅ App icons generated successfully."
           fi
 
       - name: Download Splash Screen
         run: |
           cd /tmp/appreso_build
           if [ -n "$SPLASH_SCREEN_URL" ] && [ "$SPLASH_SCREEN_URL" != "" ]; then
-            curl -L -o assets/splash.png "$SPLASH_SCREEN_URL"
+            curl -sSL -o assets/splash_original "$SPLASH_SCREEN_URL"
+            
+            # Convert to proper PNG (handles webp, jpg, etc.)
+            if command -v convert >/dev/null 2>&1; then
+              convert assets/splash_original -background none -flatten PNG32:assets/splash.png
+            elif command -v magick >/dev/null 2>&1; then
+              magick assets/splash_original -background none -flatten PNG32:assets/splash.png
+            else
+              cp assets/splash_original assets/splash.png
+            fi
+            echo "✅ Splash screen downloaded and converted."
           fi
 
       - name: Set App Label & Deep Linking in AndroidManifest.xml
