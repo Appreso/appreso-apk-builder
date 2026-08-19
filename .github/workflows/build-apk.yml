@@ -1,22 +1,28 @@
-name: Build Android APK
-run-name: "Build #${{ github.run_number }} (${{ github.event.client_payload.app_name || 'AppReso App' }})"
+name: Build APK
 
 on:
   repository_dispatch:
-    types: [build-apk]
+    types: [build-apk, build_apk]
   workflow_dispatch:
     inputs:
+      site_url:
+        description: 'Site URL'
+        required: true
+        default: 'https://example.com'
       app_name:
         description: 'App Name'
-        required: false
+        required: true
         default: 'AppReso App'
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Java 17
@@ -197,7 +203,6 @@ jobs:
           
           echo "Creating GitHub Release with tag $TAG_NAME..."
           
-          # Retry up to 5 times in case GitHub Release API has momentary 502/503 hiccups
           MAX_RETRIES=5
           COUNT=0
           SUCCESS=0
