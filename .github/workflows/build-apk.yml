@@ -41,8 +41,6 @@ jobs:
       - name: Create Pristine Flutter Project
         run: |
           flutter create --project-name appreso_app --org com.appreso --platforms android /tmp/appreso_build
-          
-          # Copy custom code into the fresh project
           cp -r lib /tmp/appreso_build/
           cp -r assets /tmp/appreso_build/ 2>/dev/null || true
           cp pubspec.yaml /tmp/appreso_build/
@@ -54,28 +52,28 @@ jobs:
         run: |
           cd /tmp/appreso_build
           mkdir -p assets
-          
-          python3 -c "
+
+          cat > /tmp/parse_payload.py << 'PYTHON_SCRIPT'
           import json, os, sys
 
-          raw = os.environ.get('EVENT_PAYLOAD', '{}')
+          raw = os.environ.get("EVENT_PAYLOAD", "{}")
           try:
               event = json.loads(raw)
           except Exception as e:
-              print(f'Error parsing event JSON: {e}')
+              print(f"Error parsing event JSON: {e}")
               event = {}
 
-          client_payload = event.get('client_payload', {})
-          inputs = event.get('inputs', {})
+          client_payload = event.get("client_payload", {})
+          inputs = event.get("inputs", {})
 
           cfg = {}
-          if isinstance(client_payload, dict) and 'config_json' in client_payload:
-              cfg_val = client_payload['config_json']
+          if isinstance(client_payload, dict) and "config_json" in client_payload:
+              cfg_val = client_payload["config_json"]
               if isinstance(cfg_val, str):
                   try:
                       cfg = json.loads(cfg_val)
                   except Exception as e:
-                      print(f'Error parsing config_json: {e}')
+                      print(f"Error parsing config_json: {e}")
                       cfg = {}
               elif isinstance(cfg_val, dict):
                   cfg = cfg_val
@@ -83,104 +81,79 @@ jobs:
               cfg = client_payload
           else:
               cfg = {
-                  'site_url': inputs.get('site_url', 'https://example.com'),
-                  'app_name': inputs.get('app_name', 'AppReso App')
+                  "site_url": inputs.get("site_url", "https://example.com"),
+                  "app_name": inputs.get("app_name", "AppReso App"),
               }
 
-          cfg['api_namespace'] = 'appreso/v1'
+          cfg["api_namespace"] = "appreso/v1"
 
-          # Write clean assets/config.json
-          with open('assets/config.json', 'w', encoding='utf-8') as f:
+          with open("assets/config.json", "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-          with open('payload.json', 'w', encoding='utf-8') as f:
+          with open("payload.json", "w", encoding="utf-8") as f:
               json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-          # Export variables to GITHUB_ENV
-          env_path = os.environ.get('GITHUB_ENV', '')
+          env_path = os.environ.get("GITHUB_ENV", "")
           if env_path and os.path.exists(env_path):
-              with open(env_path, 'a', encoding='utf-8') as f:
-                  f.write(f'APP_NAME={cfg.get(\"app_name\", \"AppReso App\")}\n')
-                  f.write(f'SITE_URL={cfg.get(\"site_url\", \"https://example.com\")}\n')
-                  f.write(f'APP_ICON_URL={cfg.get(\"app_icon_url\", \"\")}\n')
-                  f.write(f'SPLASH_SCREEN_URL={cfg.get(\"splash_screen_url\", \"\")}\n')
-                  f.write(f'DEEP_LINK_URL={cfg.get(\"deep_link_url\", \"\")}\n')
-                  f.write(f'CALLBACK_URL={cfg.get(\"callback_url\", \"\")}\n')
-                  f.write(f'CALLBACK_SECRET={cfg.get(\"callback_secret\", \"\")}\n')
-                  f.write(f'BUILD_ID={cfg.get(\"build_id\", \"\")}\n')
+              with open(env_path, "a", encoding="utf-8") as f:
+                  f.write("APP_NAME=" + cfg.get("app_name", "AppReso App") + "\n")
+                  f.write("SITE_URL=" + cfg.get("site_url", "https://example.com") + "\n")
+                  f.write("APP_ICON_URL=" + cfg.get("app_icon_url", "") + "\n")
+                  f.write("SPLASH_SCREEN_URL=" + cfg.get("splash_screen_url", "") + "\n")
+                  f.write("DEEP_LINK_URL=" + cfg.get("deep_link_url", "") + "\n")
+                  f.write("CALLBACK_URL=" + cfg.get("callback_url", "") + "\n")
+                  f.write("CALLBACK_SECRET=" + cfg.get("callback_secret", "") + "\n")
+                  f.write("BUILD_ID=" + cfg.get("build_id", "") + "\n")
 
-          print('✅ Configuration parsed successfully:')
+          print("Configuration parsed successfully:")
           print(json.dumps(cfg, indent=2, ensure_ascii=False))
-          "
+          PYTHON_SCRIPT
+
+          python3 /tmp/parse_payload.py
 
       - name: Patch Android Build Configuration
         run: |
           cd /tmp/appreso_build
-          
-          echo "=== BEFORE PATCHING ==="
-          echo "--- settings.gradle ---"
-          cat android/settings.gradle
-          echo ""
-          echo "--- app/build.gradle (minSdkVersion lines) ---"
-          grep -n "minSdkVersion" android/app/build.gradle || true
-          echo "========================"
-          
-          # 1. Update minSdkVersion to 21 (required by flutter_inappwebview)
+
+          # 1. Update minSdkVersion to 21
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle 2>/dev/null || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle 2>/dev/null || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 21/g' android/app/build.gradle 2>/dev/null || true
-          
+
           # 2. Update Gradle Wrapper to 8.3
           sed -i 's/gradle-[0-9.]*-/gradle-8.3-/g' android/gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
-          
-          # 3. Update AGP version to 7.4.2 (Kotlin 2.2.0 requires AGP >= 7.3.1, default 7.3.0)
-          sed -i 's/id "com.android.application" version "7.3.0" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
+
+          # 3. Update AGP version
           sed -i 's/id "com.android.application" version "[^"]*" apply false/id "com.android.application" version "7.4.2" apply false/g' android/settings.gradle 2>/dev/null || true
-          
+
           # 4. Update Kotlin version to 2.2.0
-          sed -i 's/id "org.jetbrains.kotlin.android" version "1.7.10" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          sed -i 's/id "org.jetbrains.kotlin.android" version "1.8.22" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.0" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          sed -i 's/id "org.jetbrains.kotlin.android" version "1.9.24" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          sed -i 's/id "org.jetbrains.kotlin.android" version "2.0.20" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle
-          
-          # 5. Fix JVM Target Compatibility (Align Java & Kotlin to Java 17)
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*" apply false/id "org.jetbrains.kotlin.android" version "2.2.0" apply false/g' android/settings.gradle 2>/dev/null || true
+
+          # 5. Fix JVM Target Compatibility
           printf "\nandroid {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    kotlinOptions {\n        jvmTarget = '17'\n    }\n}\n" >> android/app/build.gradle
-          
-          echo ""
+
           echo "=== AFTER PATCHING ==="
-          echo "--- settings.gradle ---"
           cat android/settings.gradle
-          echo ""
-          echo "--- app/build.gradle (minSdkVersion lines) ---"
           grep -n "minSdk" android/app/build.gradle || true
-          echo "========================"
 
       - name: Download and set App Icon
         run: |
           cd /tmp/appreso_build
-          
+
           if [ -n "$APP_ICON_URL" ] && [ "$APP_ICON_URL" != "" ]; then
             echo "Downloading app icon from: $APP_ICON_URL"
-            
-            # Download to original file (could be webp, jpg, svg, png etc.)
             curl -sSL -o assets/app_icon_original "$APP_ICON_URL"
-            
-            # Convert to proper PNG first (handles webp, jpg, svg, etc.)
+
+            # Convert any format (webp/jpg/svg) to real PNG
             if command -v convert >/dev/null 2>&1; then
               convert assets/app_icon_original -background none -flatten PNG32:assets/app_icon.png
-              echo "Converted icon to PNG using ImageMagick convert"
             elif command -v magick >/dev/null 2>&1; then
               magick assets/app_icon_original -background none -flatten PNG32:assets/app_icon.png
-              echo "Converted icon to PNG using ImageMagick magick"
             else
-              echo "WARNING: No ImageMagick found, copying raw file as PNG"
               cp assets/app_icon_original assets/app_icon.png
             fi
-            
-            # Verify it's a valid PNG
+
             file assets/app_icon.png
-            
+
             ICON_DIRS=(
               "android/app/src/main/res/mipmap-mdpi:48"
               "android/app/src/main/res/mipmap-hdpi:72"
@@ -188,7 +161,7 @@ jobs:
               "android/app/src/main/res/mipmap-xxhdpi:144"
               "android/app/src/main/res/mipmap-xxxhdpi:192"
             )
-            
+
             for entry in "${ICON_DIRS[@]}"; do
               DIR="${entry%%:*}"
               SIZE="${entry##*:}"
@@ -201,7 +174,7 @@ jobs:
                 cp assets/app_icon.png "$DIR/ic_launcher.png"
               fi
             done
-            echo "✅ App icons generated successfully."
+            echo "App icons generated successfully."
           fi
 
       - name: Download Splash Screen
@@ -209,8 +182,6 @@ jobs:
           cd /tmp/appreso_build
           if [ -n "$SPLASH_SCREEN_URL" ] && [ "$SPLASH_SCREEN_URL" != "" ]; then
             curl -sSL -o assets/splash_original "$SPLASH_SCREEN_URL"
-            
-            # Convert to proper PNG (handles webp, jpg, etc.)
             if command -v convert >/dev/null 2>&1; then
               convert assets/splash_original -background none -flatten PNG32:assets/splash.png
             elif command -v magick >/dev/null 2>&1; then
@@ -218,32 +189,27 @@ jobs:
             else
               cp assets/splash_original assets/splash.png
             fi
-            echo "✅ Splash screen downloaded and converted."
+            echo "Splash screen ready."
           fi
 
-      - name: Set App Label & Deep Linking in AndroidManifest.xml
+      - name: Set App Label and AndroidManifest
         run: |
           cd /tmp/appreso_build
-          
-          # Set App Label
+
           sed -i "s|android:label=\"appreso_app\"|android:label=\"${APP_NAME}\"|g" android/app/src/main/AndroidManifest.xml
-          
-          # Internet Permission & Cleartext Traffic (allows HTTP sites on Android 9+)
+
           if ! grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml; then
             sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
           fi
-          
+
           if ! grep -q 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml; then
             sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           fi
-          
-          # Deep Linking
+
           if [ -n "$DEEP_LINK_URL" ] && [ "$DEEP_LINK_URL" != "" ]; then
             SCHEME=$(echo "$DEEP_LINK_URL" | sed -E 's|^(.*)://.*|\1|')
             HOST=$(echo "$DEEP_LINK_URL" | sed -E 's|^.*://([^/]*).*|\1|')
-            
             INTENT_FILTER="<intent-filter android:autoVerify=\"true\">\n<action android:name=\"android.intent.action.VIEW\" />\n<category android:name=\"android.intent.category.DEFAULT\" />\n<category android:name=\"android.intent.category.BROWSABLE\" />\n<data android:scheme=\"$SCHEME\" android:host=\"$HOST\" />\n</intent-filter>"
-            
             sed -i "/<\/activity>/i $INTENT_FILTER" android/app/src/main/AndroidManifest.xml
           fi
 
@@ -253,7 +219,7 @@ jobs:
           flutter clean
           flutter pub get
           flutter build apk --release --no-tree-shake-icons
-          
+
           mkdir -p $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
           cp build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/
 
@@ -264,7 +230,7 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 14
 
-      - name: Create Release & Upload APK
+      - name: Create Release and Upload APK
         id: create_release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -276,39 +242,40 @@ jobs:
               --title "APK Build #${{ github.run_number }} - ${{ env.APP_NAME }}" \
               --notes "**App Name:** ${{ env.APP_NAME }}
           **Site URL:** ${{ env.SITE_URL }}
-          **Built at:** ${{ github.event.repository.updated_at }}" ; then
+          **Built at:** $(date -u)" ; then
               echo "Release published successfully!"
               exit 0
             fi
-            echo "Release creation encountered temporary server issue. Retrying in 8 seconds..."
+            echo "Retrying in 8 seconds..."
             sleep 8
           done
           echo "Failed to create release after 5 attempts."
           exit 1
 
       - name: Send callback to WordPress
+        if: success()
         run: |
           APK_URL="https://github.com/${{ github.repository }}/releases/download/build-${{ github.run_number }}/app-release.apk"
-          
+
           if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
             curl -s -o /dev/null -w "%{http_code}" \
               -X POST "$CALLBACK_URL" \
               -H "Content-Type: application/json" \
               -H "X-AppReso-Secret: $CALLBACK_SECRET" \
-              -d "{\"apk_url\": \"${APK_URL}\", \"status\": \"success\"}"
+              -d "{\"apk_url\": \"${APK_URL}\", \"status\": \"success\", \"build_id\": \"${BUILD_ID}\"}"
           fi
 
       - name: Send failure callback
         if: failure()
         run: |
           if [ -f /tmp/appreso_build/payload.json ]; then
-            CALLBACK_URL=$(jq -r '.callback_url // empty' /tmp/appreso_build/payload.json)
-            CALLBACK_SECRET=$(jq -r '.callback_secret // empty' /tmp/appreso_build/payload.json)
-            
-            if [ -n "$CALLBACK_URL" ] && [ "$CALLBACK_URL" != "" ]; then
-              curl -s -X POST "$CALLBACK_URL" \
+            FAIL_CB_URL=$(jq -r '.callback_url // empty' /tmp/appreso_build/payload.json)
+            FAIL_CB_SECRET=$(jq -r '.callback_secret // empty' /tmp/appreso_build/payload.json)
+
+            if [ -n "$FAIL_CB_URL" ] && [ "$FAIL_CB_URL" != "" ]; then
+              curl -s -X POST "$FAIL_CB_URL" \
                 -H "Content-Type: application/json" \
-                -H "X-AppReso-Secret: $CALLBACK_SECRET" \
+                -H "X-AppReso-Secret: $FAIL_CB_SECRET" \
                 -d '{"status": "failed", "error": "APK build failed. Check GitHub Actions logs."}'
             fi
           fi
