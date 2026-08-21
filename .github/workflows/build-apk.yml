@@ -54,9 +54,9 @@ jobs:
         run: |
           cd /tmp/appreso_build
           mkdir -p assets
-          
-          python3 -c "
-          import json, os, sys
+
+          cat > /tmp/parse_config.py << 'PYTHON_SCRIPT'
+          import json, os, sys, re
 
           raw = os.environ.get('EVENT_PAYLOAD', '{}')
           try:
@@ -96,34 +96,38 @@ jobs:
           with open('payload.json', 'w', encoding='utf-8') as f:
               json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-          app_ver = cfg.get("app_version", "1.0.0").strip()
-          
+          app_ver = str(cfg.get('app_version', '1.0.0')).strip()
+          if not app_ver:
+              app_ver = '1.0.0'
+
           # Patch pubspec.yaml version to match current app_version
-          if os.path.exists("pubspec.yaml"):
-              with open("pubspec.yaml", "r", encoding="utf-8") as pf:
+          if os.path.exists('pubspec.yaml'):
+              with open('pubspec.yaml', 'r', encoding='utf-8') as pf:
                   pcontent = pf.read()
-              import re
-              pcontent = re.sub(r"version:\s*.*", f"version: {app_ver}+1", pcontent)
-              with open("pubspec.yaml", "w", encoding="utf-8") as pf:
+              pcontent = re.sub(r'version:\s*.*', f'version: {app_ver}+1', pcontent)
+              with open('pubspec.yaml', 'w', encoding='utf-8') as pf:
                   pf.write(pcontent)
+              print(f'✅ Patched pubspec.yaml version to: {app_ver}+1')
 
           # Export variables to GITHUB_ENV
           env_path = os.environ.get('GITHUB_ENV', '')
           if env_path and os.path.exists(env_path):
               with open(env_path, 'a', encoding='utf-8') as f:
-                  f.write(f'APP_NAME={cfg.get(\"app_name\", \"AppReso App\")}\n')
+                  f.write(f'APP_NAME={cfg.get("app_name", "AppReso App")}\n')
                   f.write(f'APP_VERSION={app_ver}\n')
-                  f.write(f'SITE_URL={cfg.get(\"site_url\", \"https://example.com\")}\n')
-                  f.write(f'APP_ICON_URL={cfg.get(\"app_icon_url\", \"\")}\n')
-                  f.write(f'SPLASH_SCREEN_URL={cfg.get(\"splash_screen_url\", \"\")}\n')
-                  f.write(f'DEEP_LINK_URL={cfg.get(\"deep_link_url\", \"\")}\n')
-                  f.write(f'CALLBACK_URL={cfg.get(\"callback_url\", \"\")}\n')
-                  f.write(f'CALLBACK_SECRET={cfg.get(\"callback_secret\", \"\")}\n')
-                  f.write(f'BUILD_ID={cfg.get(\"build_id\", \"\")}\n')
+                  f.write(f'SITE_URL={cfg.get("site_url", "https://example.com")}\n')
+                  f.write(f'APP_ICON_URL={cfg.get("app_icon_url", "")}\n')
+                  f.write(f'SPLASH_SCREEN_URL={cfg.get("splash_screen_url", "")}\n')
+                  f.write(f'DEEP_LINK_URL={cfg.get("deep_link_url", "")}\n')
+                  f.write(f'CALLBACK_URL={cfg.get("callback_url", "")}\n')
+                  f.write(f'CALLBACK_SECRET={cfg.get("callback_secret", "")}\n')
+                  f.write(f'BUILD_ID={cfg.get("build_id", "")}\n')
 
           print('✅ Configuration parsed successfully:')
           print(json.dumps(cfg, indent=2, ensure_ascii=False))
-          "
+          PYTHON_SCRIPT
+
+          python3 /tmp/parse_config.py
 
       - name: Patch Android Build Configuration
         run: |
